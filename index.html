@@ -32,10 +32,10 @@
   <header class="app-header">
     <div class="logo" style="display: flex; align-items: center; gap: 10px;">
       <img src="img/logo-plaza.png" alt="Plaza de la Música" style="height: 36px; width: auto; object-fit: contain;">
-      <span style="font-size: 13px; font-weight: 700; color: rgba(255,255,255,0.5); letter-spacing: 0.08em; text-transform: uppercase; font-family: var(--font-body);">Control de Stock</span>
+      <span class="logo-text">Control de Stock</span>
     </div>
     <div class="header-actions">
-      <span class="calc-header-label" onclick="toggleCalcPanel()" id="header-calc-btn">Calculadora</span>
+      <button class="header-calc-btn" onclick="toggleCalcPanel()" id="header-calc-btn" aria-label="Calculadora">🧮</button>
       <button class="alerta-badge" onclick="navegarA('alertas')" aria-label="Ver alertas">
         🔔
         <span class="badge-count" id="alerta-badge-count" style="display:none">0</span>

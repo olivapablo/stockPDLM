@@ -84,6 +84,22 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   line-height: 1.2;
 }
 
+.logo-text {
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.5);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  font-family: var(--font-body);
+  white-space: nowrap;
+}
+
+@media (max-width: 400px) {
+  .logo-text {
+    display: none;
+  }
+}
+
 .header-actions {
   display: flex;
   align-items: center;
