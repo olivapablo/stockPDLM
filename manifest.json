@@ -1,0 +1,24 @@
+{
+  "name": "CONTROL DE STOCK PDLM",
+  "short_name": "CONTROL DE STOCK PDLM",
+  "description": "Gestión de stock para Plaza de la Música",
+  "start_url": ".",
+  "display": "standalone",
+  "background_color": "#0D0D0D",
+  "theme_color": "#0D0D0D",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "img/icon.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "img/icon.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ]
+}
