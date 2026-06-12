@@ -57,7 +57,7 @@ body {
 
 /* --- Transiciones globales --- */
 button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .producto-row {
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* --- Header --- */
@@ -262,9 +262,6 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   background: var(--dorado); /* Fondo dorado primario */
   color: var(--blanco);      /* Texto blanco */
   border-radius: 12px;
-  padding: 18px 24px;
-  height: auto;
-  min-height: 52px;
 }
 
 .btn-primario:active {
@@ -339,6 +336,17 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
 .input-field::placeholder {
   color: var(--gris-medio);
   opacity: 0.6;
+}
+
+select.input-field {
+  appearance: none;
+  -webkit-appearance: none;
+  background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%2364748B' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3e%3cpolyline points='6 9 12 15 18 9'%3e%3c/polyline%3e%3c/svg%3e");
+  background-repeat: no-repeat;
+  background-position: right 16px center;
+  background-size: 16px;
+  padding-right: 40px;
+  cursor: pointer;
 }
 
 /* Input numérico grande para cantidad */
@@ -945,7 +953,7 @@ input[type="number"] {
   align-items: center;
   justify-content: center;
   border-radius: 10px;
-  transition: color 0.2s, background 0.2s;
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1), background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .header-calc-btn:hover,
@@ -962,7 +970,7 @@ input[type="number"] {
   letter-spacing: 0.04em;
   color: rgba(255,255,255,0.5);
   cursor: pointer;
-  transition: color 0.2s;
+  transition: color 0.3s cubic-bezier(0.4, 0, 0.2, 1);
   white-space: nowrap;
   user-select: none;
 }
@@ -992,7 +1000,7 @@ input[type="number"] {
   padding: 20px;
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.25s ease;
+  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calc-overlay.visible {
@@ -1048,7 +1056,7 @@ input[type="number"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: background 0.2s;
+  transition: background 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calc-cerrar-btn:hover {
@@ -1096,7 +1104,7 @@ input[type="number"] {
   display: flex;
   align-items: center;
   justify-content: center;
-  transition: opacity 0.1s, transform 0.1s;
+  transition: opacity 0.2s cubic-bezier(0.4, 0, 0.2, 1), transform 0.2s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calc-btn:active {
@@ -1123,7 +1131,7 @@ input[type="number"] {
 /* --- Calculadora Rápida Estilo Champagne Premium --- */
 .calculadora-container {
   z-index: 150;
-  transition: all 0.25s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* ---- MÓVIL: Backdrop blur + panel centrado ---- */
@@ -1260,7 +1268,7 @@ input[type="number"] {
   padding: 20px;
   box-shadow: var(--sombra-elevada);
   border: 1.5px solid var(--gris-borde);
-  transition: all 0.2s ease;
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 .calc-screen {

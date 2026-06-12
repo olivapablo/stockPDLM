@@ -205,6 +205,9 @@ function renderCargar() {
     </div>
 
     <div id="formulario-stock" style="display:none">
+      <div class="input-group" style="margin-bottom:16px;">
+        <input type="text" class="input-field" id="input-buscador" placeholder="Buscar bebida o categoría..." oninput="filtrarProductos(this.value)">
+      </div>
       <div id="lista-productos"></div>
       <div style="position:sticky;bottom:calc(var(--nav-height) + 12px);padding:12px 0;background:var(--gris-fondo)">
         <button class="btn btn-primario btn-full" onclick="confirmarGuardar()" id="btn-guardar">
@@ -266,6 +269,7 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
     // Agrupar por marca
     const marcas = [...new Set(prodsCat.map(p => p.marca))];
 
+    html += `<div class="categoria-section" data-cat="${cat.toLowerCase()}">`;
     html += `<div class="categoria-header"><span>📁</span>${cat}</div>`;
 
     marcas.forEach(marca => {
@@ -287,9 +291,10 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
         const packSize = tieneSueltas ? getPackSize(p.marca, p.variante) : null;
         const nombreMostrado = prodsMarca.length === 1 ? p.nombre :
           (p.variante === "Común" ? marca : p.variante);
+        const searchKeywords = `${cat} ${marca} ${p.nombre} ${p.variante}`.toLowerCase();
 
         html += `
-          <div class="producto-row${tieneSueltas ? ' tiene-sueltas' : ''}">
+          <div class="producto-row${tieneSueltas ? ' tiene-sueltas' : ''}" data-search="${searchKeywords}">
             <div class="producto-info">
               <div class="producto-nombre">${nombreMostrado}</div>
               <div class="producto-unidad">${p.unidad}${packSize ? ` ×${packSize}` : ''}</div>
@@ -325,6 +330,7 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
 
       html += `</div>`;
     });
+    html += `</div>`;
   });
 
   el.innerHTML = html;
@@ -338,6 +344,34 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
   }
 }
 
+window.filtrarProductos = function(texto) {
+  const query = texto.toLowerCase().trim();
+  const secciones = document.querySelectorAll("#lista-productos .categoria-section");
+  
+  secciones.forEach(sec => {
+    let tieneVisibles = false;
+    const catName = sec.getAttribute("data-cat");
+    const filas = sec.querySelectorAll(".producto-row");
+    
+    filas.forEach(fila => {
+      const searchStr = fila.getAttribute("data-search");
+      if (query === "" || searchStr.includes(query) || catName.includes(query)) {
+        fila.style.display = "";
+        tieneVisibles = true;
+      } else {
+        fila.style.display = "none";
+      }
+    });
+
+    const grupos = sec.querySelectorAll(".subcategoria-grupo");
+    grupos.forEach(grupo => {
+      const algunVisible = Array.from(grupo.querySelectorAll(".producto-row")).some(f => f.style.display !== "none");
+      grupo.style.display = algunVisible ? "" : "none";
+    });
+
+    sec.style.display = tieneVisibles ? "" : "none";
+  });
+};
 
 // Muestra el modal de confirmación antes de guardar
 function confirmarGuardar() {
@@ -451,10 +485,10 @@ function mostrarModalExito(fecha, guardados, hayOffline) {
       ${mensajeGuardado}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <button class="btn btn-dorado" onclick="descargarPDF('${fecha}');cerrarModal()">
-        📄 Exportar PDF
+      <button class="btn btn-dorado btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="descargarPDF('${fecha}');cerrarModal()">
+        📄 Exportar
       </button>
-      <button class="btn btn-primario" onclick="compartirPDF('${fecha}')">
+      <button class="btn btn-primario btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="compartirPDF('${fecha}')">
         📤 Compartir
       </button>
     </div>
@@ -463,6 +497,15 @@ function mostrarModalExito(fecha, guardados, hayOffline) {
     </button>
   `;
   overlay.classList.add("visible");
+
+  if (typeof confetti === "function" && !hayOffline) {
+    confetti({
+      particleCount: 120,
+      spread: 70,
+      origin: { y: 0.6 },
+      colors: ['#00A8D5', '#1E7D45', '#D500C7']
+    });
+  }
 }
 
 // =============================================

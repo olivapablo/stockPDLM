@@ -40,15 +40,39 @@ async function exportarPDF(fecha) {
     }
   });
 
+  // --- Cargar Logo en negro ---
+  const logoProps = await new Promise((resolve) => {
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      ctx.globalCompositeOperation = "source-in";
+      ctx.fillStyle = "#000000";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      resolve({ url: canvas.toDataURL("image/png"), w: img.width, h: img.height });
+    };
+    img.onerror = () => resolve(null);
+    img.src = "img/logo-plaza.png";
+  });
+
   // --- Encabezado ---
+  if (logoProps) {
+    const targetHeight = 12;
+    const targetWidth = logoProps.w * (targetHeight / logoProps.h);
+    doc.addImage(logoProps.url, 'PNG', 14, 12, targetWidth, targetHeight);
+  }
+
   doc.setFont("helvetica", "bold");
   doc.setFontSize(16);
-  doc.text("PLAZA DE LA MÚSICA", 105, 15, { align: "center" });
+  doc.text("CONTROL DE STOCK", 105, 18, { align: "center" });
 
   doc.setFontSize(10);
   doc.setFont("helvetica", "normal");
-  doc.text(`Fecha: ${formatFechaDisplay(fecha)}`, 105, 22, { align: "center" });
-  doc.text(`Generado: ${formatFechaDisplay(formatFecha(new Date()))}`, 105, 27, { align: "center" });
+  doc.text(`Fecha: ${formatFechaDisplay(fecha)}`, 196, 16, { align: "right" });
+  doc.text(`Generado: ${formatFechaDisplay(formatFecha(new Date()))}`, 196, 22, { align: "right" });
 
   // Línea separadora
   doc.setLineWidth(0.5);
