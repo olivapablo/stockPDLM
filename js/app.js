@@ -1084,7 +1084,7 @@ function renderEntradas() {
         </div>
 
         <div class="input-group" style="margin-bottom:12px">
-          <label class="input-label">Cantidad que ingresa</label>
+          <label class="input-label" id="entrada-cantidad-label">Cantidad que ingresa</label>
           <input type="number" class="input-field" id="entrada-cantidad"
             min="1" placeholder="0" inputmode="numeric"
             style="font-size:1.6rem;font-weight:700;text-align:center;height:60px">
@@ -1188,6 +1188,17 @@ window.seleccionarProductoEntrada = function(prodId, nombre, unidad) {
   document.getElementById("entrada-prod-nombre").textContent = nombre;
   document.getElementById("entrada-prod-unidad").textContent = unidad;
 
+  // Actualizar label de cantidad con la unidad correspondente
+  const label = document.getElementById("entrada-cantidad-label");
+  if (label) {
+    let unidadPlural = unidad;
+    if (unidad === "pack") unidadPlural = "packs";
+    else if (unidad === "caja") unidadPlural = "cajas";
+    else if (unidad === "bot") unidadPlural = "botellas";
+    else if (unidad === "ud") unidadPlural = "unidades";
+    label.innerHTML = `Cantidad que ingresa <span style="color:var(--dorado);font-weight:700;text-transform:lowercase">(${unidadPlural})</span>`;
+  }
+
   document.getElementById("entrada-cantidad").focus();
 };
 
@@ -1197,6 +1208,12 @@ window.limpiarSeleccionEntrada = function() {
   document.getElementById("entrada-selector-productos").style.display = "block";
   document.getElementById("entrada-buscador").style.display = "block";
   document.getElementById("entrada-buscador").value = "";
+
+  const label = document.getElementById("entrada-cantidad-label");
+  if (label) {
+    label.textContent = "Cantidad que ingresa";
+  }
+
   renderSelectorProductosEntrada("");
 };
 
