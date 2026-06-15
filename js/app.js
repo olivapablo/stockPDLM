@@ -223,6 +223,12 @@ function ajustarInterfazPorRol() {
   const navBottom = document.querySelector(".nav-bottom");
   if (!navBottom) return;
 
+  // Ocultar la calculadora para el visualizador
+  const calcBtn = document.getElementById("header-calc-btn");
+  if (calcBtn) {
+    calcBtn.style.display = STATE.userRole === "visualizador" ? "none" : "block";
+  }
+
   if (STATE.userRole === "visualizador") {
     navBottom.innerHTML = `
       <button class="nav-item ${STATE.vistaActual === 'dashboard' ? 'activo' : ''}" data-vista="dashboard">
@@ -232,6 +238,10 @@ function ajustarInterfazPorRol() {
       <button class="nav-item ${STATE.vistaActual === 'ver-stock' ? 'activo' : ''}" data-vista="ver-stock">
         <span class="nav-icon">📊</span>
         Ver Stock
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'consumo' ? 'activo' : ''}" data-vista="consumo">
+        <span class="nav-icon">📈</span>
+        Consumo
       </button>
       <button class="nav-item ${STATE.vistaActual === 'alertas' ? 'activo' : ''}" data-vista="alertas">
         <span class="nav-icon">🔔</span>
@@ -319,7 +329,11 @@ window.seleccionarOpcionMas = function(vista) {
 // --- Navegación ---
 function navegarA(vista) {
   // Bloquear acceso a visualizadores
-  if (STATE.userRole === "visualizador" && !["dashboard", "ver-stock", "alertas"].includes(vista)) {
+  if (STATE.userRole === "visualizador" && !["dashboard", "ver-stock", "consumo", "alertas"].includes(vista)) {
+    return mostrarToast("No tienes permisos para ver esta sección", "error");
+  }
+  // Bloquear acceso a consumo para no-visualizadores (admin y editor)
+  if (STATE.userRole !== "visualizador" && vista === "consumo") {
     return mostrarToast("No tienes permisos para ver esta sección", "error");
   }
   // Bloquear acceso a editores a config
@@ -335,7 +349,7 @@ function navegarA(vista) {
   document.getElementById(`vista-${vista}`)?.classList.add("activa");
 
   // Resaltar la pestaña activa
-  if (["dashboard", "cargar", "ver-stock", "alertas", "historial"].includes(vista)) {
+  if (["dashboard", "cargar", "ver-stock", "consumo", "alertas", "historial"].includes(vista)) {
     document.querySelector(`.nav-item[data-vista="${vista}"]`)?.classList.add("activo");
   } else {
     document.getElementById("btn-nav-mas")?.classList.add("activo");
@@ -353,6 +367,7 @@ function navegarA(vista) {
     case "dashboard": renderDashboard(); break;
     case "cargar": renderCargar(); break;
     case "ver-stock": renderVerStock(); break;
+    case "consumo": renderConsumo(); break;
     case "alertas": renderAlertas(); break;
     case "historial": renderHistorial(); break;
     case "config": renderConfig(); break;
@@ -2438,3 +2453,265 @@ window.filtrarProductosVerStock = function(texto) {
     sec.style.display = tieneVisibles ? "" : "none";
   });
 };
+
+// =============================================
+// VISTA: CONSUMO (GRÁFICOS DE ANÁLISIS)
+// =============================================
+STATE.consumoPeriodo = "semana";
+STATE.consumoRawData = null;
+
+async function renderConsumo() {
+  const el = document.getElementById("consumo-content");
+  if (!el) return;
+
+  el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando datos de consumo...</div></div>`;
+
+  try {
+    // Fetch all stock history and entries
+    const [plazaStockSnap, lariojaStockSnap, plazaEntradasSnap, lariojaEntradasSnap] = await Promise.all([
+      db.ref("stock/plaza").get(),
+      db.ref("stock/larioja").get(),
+      db.ref("entradas/plaza").get(),
+      db.ref("entradas/larioja").get()
+    ]);
+
+    const plazaStock = plazaStockSnap.val() || {};
+    const lariojaStock = lariojaStockSnap.val() || {};
+
+    const fechas = [...new Set([...Object.keys(plazaStock), ...Object.keys(lariojaStock)])].sort();
+
+    if (fechas.length < 2) {
+      el.innerHTML = `
+        <div class="estado-vacio">
+          <div class="vacio-icono">📊</div>
+          <div class="vacio-texto">
+            Se necesitan al menos 2 conteos semanales de stock registrados para calcular el consumo.<br>
+            <span style="font-size:0.8rem;color:var(--gris-medio)">Actualmente hay ${fechas.length} conteo(s).</span>
+          </div>
+        </div>
+      `;
+      return;
+    }
+
+    const entriesList = [];
+    if (plazaEntradasSnap.exists()) {
+      Object.values(plazaEntradasSnap.val()).forEach(ent => entriesList.push(ent));
+    }
+    if (lariojaEntradasSnap.exists()) {
+      Object.values(lariojaEntradasSnap.val()).forEach(ent => entriesList.push(ent));
+    }
+
+    // Save data to state to avoid re-fetching
+    STATE.consumoRawData = { fechas, plazaStock, lariojaStock, entriesList };
+
+    // Render container layout
+    el.innerHTML = `
+      <div class="period-tabs-container">
+        <div class="period-tabs">
+          <button class="period-tab ${STATE.consumoPeriodo === 'semana' ? 'active' : ''}" data-periodo="semana" onclick="cambiarPeriodoConsumo('semana')">Semana</button>
+          <button class="period-tab ${STATE.consumoPeriodo === 'mes' ? 'active' : ''}" data-periodo="mes" onclick="cambiarPeriodoConsumo('mes')">Mes</button>
+          <button class="period-tab ${STATE.consumoPeriodo === 'trimestre' ? 'active' : ''}" data-periodo="trimestre" onclick="cambiarPeriodoConsumo('trimestre')">3 Meses</button>
+          <button class="period-tab ${STATE.consumoPeriodo === 'semestre' ? 'active' : ''}" data-periodo="semestre" onclick="cambiarPeriodoConsumo('semestre')">6 Meses</button>
+        </div>
+      </div>
+      <div id="consumo-charts-container"></div>
+    `;
+
+    renderConsumoCharts();
+
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">❌</div><div class="vacio-texto">Error al cargar datos.</div></div>`;
+  }
+}
+
+window.cambiarPeriodoConsumo = function(periodo) {
+  STATE.consumoPeriodo = periodo;
+  document.querySelectorAll(".period-tab").forEach(btn => {
+    btn.classList.toggle("active", btn.getAttribute("data-periodo") === periodo);
+  });
+  renderConsumoCharts();
+};
+
+function renderConsumoCharts() {
+  const container = document.getElementById("consumo-charts-container");
+  if (!container || !STATE.consumoRawData) return;
+
+  const { fechas, plazaStock, lariojaStock, entriesList } = STATE.consumoRawData;
+
+  // Calculate all weekly intervals
+  const intervals = calcularConsumos(fechas, plazaStock, lariojaStock, entriesList);
+
+  if (intervals.length === 0) {
+    container.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">Sin datos de consumo suficientes.</div></div>`;
+    return;
+  }
+
+  // Determine intervals to analyze based on period selection
+  let limit = 1;
+  if (STATE.consumoPeriodo === "semana") limit = 1;
+  else if (STATE.consumoPeriodo === "mes") limit = 4;
+  else if (STATE.consumoPeriodo === "trimestre") limit = 12;
+  else if (STATE.consumoPeriodo === "semestre") limit = 24;
+
+  const selectedIntervals = intervals.slice(-limit);
+
+  // 1. COMPARATIVA SEMANAS (Consumo total por semana)
+  // Let's show the last 6 intervals to give a nice trend chart
+  const trendIntervals = intervals.slice(-6);
+  const maxWeeklyCons = Math.max(...trendIntervals.map(inv => inv.totalConsumo), 1);
+
+  let weeklyBarsHTML = "";
+  trendIntervals.forEach(inv => {
+    const startDisp = formatFechaDisplay(inv.start).slice(0, 5);
+    const endDisp = formatFechaDisplay(inv.end).slice(0, 5);
+    const label = `${startDisp}-${endDisp}`;
+    const pct = Math.round((inv.totalConsumo / maxWeeklyCons) * 100);
+
+    weeklyBarsHTML += `
+      <div class="bar-item">
+        <div class="bar-value">${inv.totalConsumo}</div>
+        <div class="bar-fill" style="height: ${pct}%;"></div>
+        <div class="bar-label">${label}</div>
+      </div>
+    `;
+  });
+
+  // 2. PRODUCT RANKING (Consumo consolidado de productos en el periodo seleccionado)
+  const productConsumoConsolidated = {};
+  selectedIntervals.forEach(inv => {
+    Object.entries(inv.consumoPorProducto).forEach(([pId, val]) => {
+      productConsumoConsolidated[pId] = (productConsumoConsolidated[pId] || 0) + val;
+    });
+  });
+
+  const productos = getProductosFlat();
+  const sortedRanking = Object.entries(productConsumoConsolidated)
+    .map(([pId, val]) => {
+      const p = productos.find(prod => prod.id === pId);
+      return { pId, val, producto: p };
+    })
+    .filter(item => item.val > 0 && item.producto)
+    .sort((a, b) => b.val - a.val);
+
+  const maxProductCons = sortedRanking.length > 0 ? sortedRanking[0].val : 1;
+
+  let rankingHTML = "";
+  if (sortedRanking.length === 0) {
+    rankingHTML = `<div style="text-align:center;color:var(--gris-medio);padding:20px;font-size:0.9rem">No se registraron consumos en este período.</div>`;
+  } else {
+    sortedRanking.slice(0, 10).forEach(item => {
+      const p = item.producto;
+      const pct = Math.round((item.val / maxProductCons) * 100);
+      
+      let labelUnidad = p.unidad;
+      if (p.unidad === 'pack') labelUnidad = 'packs';
+      else if (p.unidad === 'caja') labelUnidad = 'cajas';
+      else if (p.unidad === 'bot') labelUnidad = 'botellas';
+      else if (p.unidad === 'ud') labelUnidad = 'unidades';
+
+      rankingHTML += `
+        <div class="ranking-item">
+          <div class="ranking-info">
+            <span class="ranking-name">${p.nombre}</span>
+            <span class="ranking-units">${item.val} ${labelUnidad}</span>
+          </div>
+          <div class="ranking-bar-wrapper">
+            <div class="ranking-bar-fill" style="width: ${pct}%;"></div>
+          </div>
+        </div>
+      `;
+    });
+  }
+
+  container.innerHTML = `
+    <div class="card" style="margin-top: 16px;">
+      <div class="card-titulo">Comparativa entre semanas</div>
+      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 12px;">Consumo total (unidades) en las últimas semanas</div>
+      <div class="bar-chart">
+        ${weeklyBarsHTML}
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-titulo">Ranking de Consumo de Bebidas</div>
+      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 16px;">Bebidas más consumidas en el período seleccionado (${STATE.consumoPeriodo === 'semana' ? 'última semana' : STATE.consumoPeriodo === 'mes' ? 'último mes' : STATE.consumoPeriodo === 'trimestre' ? 'últimos 3 meses' : 'últimos 6 meses'})</div>
+      <div id="ranking-list">
+        ${rankingHTML}
+      </div>
+    </div>
+  `;
+}
+
+function calcularConsumos(fechas, plazaStock, lariojaStock, entriesList) {
+  const intervals = [];
+  
+  for (let i = 0; i < fechas.length - 1; i++) {
+    const start = fechas[i];
+    const end = fechas[i+1];
+    
+    // Get stock start
+    const stockStart = {};
+    if (plazaStock[start]) {
+      Object.entries(plazaStock[start]).forEach(([pId, v]) => {
+        stockStart[pId] = (stockStart[pId] || 0) + Number(v.cantidad || 0);
+      });
+    }
+    if (lariojaStock[start]) {
+      Object.entries(lariojaStock[start]).forEach(([pId, v]) => {
+        stockStart[pId] = (stockStart[pId] || 0) + Number(v.cantidad || 0);
+      });
+    }
+    
+    // Get stock end
+    const stockEnd = {};
+    if (plazaStock[end]) {
+      Object.entries(plazaStock[end]).forEach(([pId, v]) => {
+        stockEnd[pId] = (stockEnd[pId] || 0) + Number(v.cantidad || 0);
+      });
+    }
+    if (lariojaStock[end]) {
+      Object.entries(lariojaStock[end]).forEach(([pId, v]) => {
+        stockEnd[pId] = (stockEnd[pId] || 0) + Number(v.cantidad || 0);
+      });
+    }
+    
+    // Sum entries in range (start, end]
+    const entries = {};
+    entriesList.forEach(ent => {
+      if (ent.fecha > start && ent.fecha <= end) {
+        entries[ent.productoId] = (entries[ent.productoId] || 0) + Number(ent.cantidad || 0);
+      }
+    });
+    
+    // Compute consumption per product
+    const prodConsumo = {};
+    const allProdIds = new Set([
+      ...Object.keys(stockStart),
+      ...Object.keys(stockEnd),
+      ...Object.keys(entries)
+    ]);
+    
+    let totalUnidadesInterval = 0;
+    allProdIds.forEach(pId => {
+      const cStart = stockStart[pId] || 0;
+      const cEnd = stockEnd[pId] || 0;
+      const cEnt = entries[pId] || 0;
+      
+      const cons = cStart + cEnt - cEnd;
+      const finalCons = cons > 0 ? cons : 0;
+      
+      prodConsumo[pId] = finalCons;
+      totalUnidadesInterval += finalCons;
+    });
+    
+    intervals.push({
+      start,
+      end,
+      consumoPorProducto: prodConsumo,
+      totalConsumo: totalUnidadesInterval
+    });
+  }
+  
+  return intervals;
+}
