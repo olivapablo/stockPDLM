@@ -4,7 +4,7 @@
 // en Firebase Console > Configuración del proyecto
 // =============================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCoQ_gzfCgREGPQKTbokFu4qqkxwTa9HX4",
+  apiKey: "AIzaSyCoQ_gzFCgREGPQKTbokFu4qqkxwTa9HX4",
   authDomain: "stock-plaza.firebaseapp.com",
   databaseURL: "https://stock-plaza-default-rtdb.firebaseio.com",
   projectId: "stock-plaza",
