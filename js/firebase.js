@@ -35,7 +35,14 @@ const CONFIG_KEY = "plaza_stock_config";
 
 function getConfig() {
   const saved = localStorage.getItem(CONFIG_KEY);
-  return saved ? JSON.parse(saved) : { umbralAlerta: 10 };
+  const def = { umbralAlerta: 10, diasAlertaVencimiento: 15 };
+  if (!saved) return def;
+  try {
+    const parsed = JSON.parse(saved);
+    return { ...def, ...parsed };
+  } catch (e) {
+    return def;
+  }
 }
 
 function setConfig(config) {
@@ -96,6 +103,17 @@ async function syncOfflineQueue() {
             origen: "entrada"
           });
         }
+      } else if (entry.tipo === "vencimiento") {
+        const registro = {
+          productoId: entry.productoId,
+          cantidad: Number(entry.cantidad),
+          fechaVencimiento: entry.fechaVencimiento,
+          fechaRegistro: entry.fechaRegistro,
+          responsable: entry.responsable,
+          origen: "manual",
+          timestamp: entry.timestamp
+        };
+        await db.ref(`vencimientos/${entry.depositoId}`).push(registro);
       } else {
         // Conteo semanal normal
         await db.ref(`stock/${entry.depositoId}/${entry.fecha}/${entry.productoId}`).set(entry);
@@ -217,6 +235,74 @@ async function getEntradas(depositoId) {
   return Object.entries(obj)
     .map(([id, val]) => ({ id, ...val }))
     .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
+}
+
+// Nueva función: Registrar Vencimiento Manual
+async function guardarVencimientoManual(depositoId, productoId, cantidad, fechaVencimiento, responsable) {
+  const ahora = new Date();
+  const fechaRegistro = formatFecha(ahora);
+  const timestamp = ahora.toISOString();
+
+  if (!navigator.onLine) {
+    addToOfflineQueue({
+      tipo: "vencimiento",
+      depositoId,
+      productoId,
+      cantidad: Number(cantidad),
+      fechaVencimiento,
+      responsable,
+      fechaRegistro,
+      timestamp
+    });
+    return { offline: true };
+  }
+
+  const registro = {
+    productoId,
+    cantidad: Number(cantidad),
+    fechaVencimiento,
+    fechaRegistro,
+    responsable,
+    origen: "manual",
+    timestamp
+  };
+
+  await db.ref(`vencimientos/${depositoId}`).push(registro);
+  return { offline: false };
+}
+
+// Nueva función: Obtener todos los vencimientos ordenados cronológicamente
+async function getTodosVencimientos() {
+  const [plazaSnap, lariojaSnap] = await Promise.all([
+    db.ref("vencimientos/plaza").get(),
+    db.ref("vencimientos/larioja").get()
+  ]);
+
+  const list = [];
+  if (plazaSnap.exists()) {
+    Object.entries(plazaSnap.val()).forEach(([id, val]) => {
+      list.push({ id, depositoId: "plaza", ...val });
+    });
+  }
+  if (lariojaSnap.exists()) {
+    Object.entries(lariojaSnap.val()).forEach(([id, val]) => {
+      list.push({ id, depositoId: "larioja", ...val });
+    });
+  }
+
+  // Ordenar por fechaVencimiento ascendente (los que vencen antes primero)
+  list.sort((a, b) => {
+    if (!a.fechaVencimiento) return 1;
+    if (!b.fechaVencimiento) return -1;
+    return a.fechaVencimiento.localeCompare(b.fechaVencimiento);
+  });
+
+  return list;
+}
+
+// Nueva función: Eliminar vencimiento
+async function eliminarVencimiento(depositoId, autoId) {
+  await db.ref(`vencimientos/${depositoId}/${autoId}`).remove();
 }
 
 async function getStockPorFecha(depositoId, fecha) {

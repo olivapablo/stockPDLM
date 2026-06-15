@@ -224,6 +224,7 @@ function ajustarInterfazPorRol() {
   const navHistorial = document.querySelector(`.nav-item[data-vista="historial"]`);
   const navConfig = document.querySelector(`.nav-item[data-vista="config"]`);
   const navEntradas = document.querySelector(`.nav-item[data-vista="entradas"]`);
+  const navVencimientos = document.querySelector(`.nav-item[data-vista="vencimientos"]`);
 
   if (STATE.userRole === "visualizador") {
     if(navCargar) {
@@ -233,6 +234,7 @@ function ajustarInterfazPorRol() {
     if(navHistorial) navHistorial.style.display = "none";
     if(navConfig) navConfig.style.display = "none";
     if(navEntradas) navEntradas.style.display = "none";
+    if(navVencimientos) navVencimientos.style.display = "none";
   } else {
     if(navCargar) {
       navCargar.style.display = "flex";
@@ -242,11 +244,13 @@ function ajustarInterfazPorRol() {
       if(navHistorial) navHistorial.style.display = "flex";
       if(navConfig) navConfig.style.display = "none";
       if(navEntradas) navEntradas.style.display = "flex";
+      if(navVencimientos) navVencimientos.style.display = "flex";
     } else {
       // Admin
       if(navHistorial) navHistorial.style.display = "flex";
       if(navConfig) navConfig.style.display = "flex";
       if(navEntradas) navEntradas.style.display = "flex";
+      if(navVencimientos) navVencimientos.style.display = "flex";
     }
   }
 }
@@ -254,7 +258,7 @@ function ajustarInterfazPorRol() {
 // --- Navegación ---
 function navegarA(vista) {
   // Bloquear acceso a visualizadores
-  if (STATE.userRole === "visualizador" && ["historial", "config", "entradas"].includes(vista)) {
+  if (STATE.userRole === "visualizador" && ["historial", "config", "entradas", "vencimientos"].includes(vista)) {
     return mostrarToast("No tienes permisos para ver esta sección", "error");
   }
   // Bloquear acceso a editores a config
@@ -285,6 +289,7 @@ function navegarA(vista) {
     case "historial": renderHistorial(); break;
     case "config": renderConfig(); break;
     case "entradas": renderEntradas(); break;
+    case "vencimientos": renderVencimientos(); break;
   }
 }
 
@@ -298,16 +303,18 @@ async function renderDashboard() {
   el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando...</div></div>`;
 
   try {
-    const [stockPlaza, stockLarioja] = await Promise.all([
+    const [stockPlaza, stockLarioja, vencimientos] = await Promise.all([
       getStockActual("plaza"),
-      getStockActual("larioja")
+      getStockActual("larioja"),
+      getTodosVencimientos()
     ]);
 
     const productos = getProductosFlat();
     const config = getConfig();
     const umbral = config.umbralAlerta;
+    const diasAlerta = config.diasAlertaVencimiento ?? 15;
 
-    // Calcular alertas globales
+    // Calcular alertas globales de stock
     const alertas = [];
     productos.forEach(p => {
       const cantPlaza = stockPlaza[p.id]?.cantidad ?? null;
@@ -319,28 +326,61 @@ async function renderDashboard() {
       }
     });
 
+    // Calcular alertas de vencimiento
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+    const alertasVenc = [];
+    vencimientos.forEach(item => {
+      const fechaVenc = new Date(item.fechaVencimiento + "T00:00:00");
+      fechaVenc.setHours(0,0,0,0);
+      const diffTime = fechaVenc - hoy;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays <= diasAlerta) {
+        alertasVenc.push({ item, diffDays });
+      }
+    });
+
+    const totalStockBajo = alertas.length;
+    const totalVencProximos = alertasVenc.length;
+    const totalAlertasConsolidado = totalStockBajo + totalVencProximos;
+
     // Actualizar badge
     const badge = document.getElementById("alerta-badge-count");
     if (badge) {
-      badge.textContent = alertas.length;
-      badge.style.display = (!STATE.alertasVistas && alertas.length > 0) ? "flex" : "none";
+      badge.textContent = totalAlertasConsolidado;
+      badge.style.display = (!STATE.alertasVistas && totalAlertasConsolidado > 0) ? "flex" : "none";
     }
 
     // Banner de alertas
-    const bannerHTML = alertas.length > 0 ? `
-      <div class="banner-alerta" onclick="navegarA('alertas')" style="cursor:pointer">
-        <span class="alerta-icono">⚠️</span>
-        <div>
-          <div class="alerta-texto">${alertas.length} producto${alertas.length > 1 ? "s" : ""} con stock bajo</div>
-          <div style="font-size:0.78rem;color:var(--rojo-alerta);opacity:0.8">Tocá para ver el detalle</div>
+    let bannerHTML = "";
+    if (totalAlertasConsolidado > 0) {
+      let textoDetalle = "";
+      if (totalStockBajo > 0 && totalVencProximos > 0) {
+        textoDetalle = `${totalStockBajo} stock bajo y ${totalVencProximos} vencimiento${totalVencProximos > 1 ? "s" : ""} próximo${totalVencProximos > 1 ? "s" : ""}`;
+      } else if (totalStockBajo > 0) {
+        textoDetalle = `${totalStockBajo} producto${totalStockBajo > 1 ? "s" : ""} con stock bajo`;
+      } else {
+        textoDetalle = `${totalVencProximos} vencimiento${totalVencProximos > 1 ? "s" : ""} próximo${totalVencProximos > 1 ? "s" : ""}`;
+      }
+
+      bannerHTML = `
+        <div class="banner-alerta" onclick="navegarA('alertas')" style="cursor:pointer">
+          <span class="alerta-icono">⚠️</span>
+          <div>
+            <div class="alerta-texto">${totalAlertasConsolidado} alerta${totalAlertasConsolidado > 1 ? "s" : ""} activa${totalAlertasConsolidado > 1 ? "s" : ""}</div>
+            <div style="font-size:0.78rem;color:var(--rojo-alerta);opacity:0.8">${textoDetalle}. Tocá para ver.</div>
+          </div>
         </div>
-      </div>
-    ` : `
-      <div style="background:var(--verde-bg);border:1px solid var(--verde);border-radius:var(--radio);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
-        <span style="font-size:1.3rem">✅</span>
-        <span style="font-size:0.88rem;color:var(--verde);font-weight:600">Todo el stock en orden</span>
-      </div>
-    `;
+      `;
+    } else {
+      bannerHTML = `
+        <div style="background:var(--verde-bg);border:1px solid var(--verde);border-radius:var(--radio);padding:14px 16px;margin-bottom:16px;display:flex;align-items:center;gap:10px">
+          <span style="font-size:1.3rem">✅</span>
+          <span style="font-size:0.88rem;color:var(--verde);font-weight:600">Todo el stock y vencimientos en orden</span>
+        </div>
+      `;
+    }
 
     // Resumen por depósito
     const fechasPlaza = await getFechasDisponibles("plaza");
@@ -737,10 +777,12 @@ async function renderAlertas() {
   const productos = getProductosFlat();
   const config = getConfig();
   const umbral = config.umbralAlerta;
+  const diasAlerta = config.diasAlertaVencimiento ?? 15;
 
-  const [stockPlaza, stockLarioja] = await Promise.all([
+  const [stockPlaza, stockLarioja, vencimientos] = await Promise.all([
     getStockActual("plaza"),
-    getStockActual("larioja")
+    getStockActual("larioja"),
+    getTodosVencimientos()
   ]);
 
   const alertas = [];
@@ -756,11 +798,29 @@ async function renderAlertas() {
     }
   });
 
-  if (alertas.length === 0) {
+  const hoy = new Date();
+  hoy.setHours(0,0,0,0);
+  const alertasVenc = [];
+  vencimientos.forEach(item => {
+    const fechaVenc = new Date(item.fechaVencimiento + "T00:00:00");
+    fechaVenc.setHours(0,0,0,0);
+    const diffTime = fechaVenc - hoy;
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    if (diffDays <= diasAlerta) {
+      alertasVenc.push({ item, diffDays });
+    }
+  });
+
+  const totalStockBajo = alertas.length;
+  const totalVencProximos = alertasVenc.length;
+  const totalAlertas = totalStockBajo + totalVencProximos;
+
+  if (totalAlertas === 0) {
     el.innerHTML = `
       <div class="estado-vacio">
         <div class="vacio-icono">✅</div>
-        <div class="vacio-texto">No hay productos con stock bajo.<br>Umbral actual: ${umbral} unidades.</div>
+        <div class="vacio-texto">No hay alertas activas.<br>Umbral de stock: ${umbral} unidades.<br>Alerta de vencimiento: ${diasAlerta} días.</div>
       </div>
     `;
     return;
@@ -770,26 +830,82 @@ async function renderAlertas() {
     <div class="banner-alerta">
       <span class="alerta-icono">⚠️</span>
       <div>
-        <div class="alerta-texto">${alertas.length} alerta${alertas.length > 1 ? "s" : ""} activa${alertas.length > 1 ? "s" : ""}</div>
-        <div style="font-size:0.75rem;color:var(--rojo-alerta);opacity:0.8">Umbral: menos de ${umbral} unidades</div>
+        <div class="alerta-texto">
+          ${totalStockBajo > 0 ? `${totalStockBajo} stock bajo` : ""}${totalStockBajo > 0 && totalVencProximos > 0 ? ", " : ""}${totalVencProximos > 0 ? `${totalVencProximos} vencimiento${totalVencProximos > 1 ? "s" : ""} próximo${totalVencProximos > 1 ? "s" : ""}` : ""}
+        </div>
+        <div style="font-size:0.75rem;color:var(--rojo-alerta);opacity:0.8">
+          Umbral: < ${umbral} uds. · Alerta vencimiento: <= ${diasAlerta} días
+        </div>
       </div>
     </div>
   `;
 
-  alertas.forEach(a => {
+  if (totalStockBajo > 0) {
     html += `
-      <div class="alerta-item">
-        <div>
-          <div class="alerta-producto">${a.producto.nombre}</div>
-          <div class="alerta-deposito">${a.deposito} · ${a.producto.unidad}</div>
-        </div>
-        <div class="alerta-cantidad">${a.cantidad} ${a.producto.unidad}</div>
-      </div>
+      <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--gris-medio);margin-top:16px;margin-bottom:8px;font-weight:700">Stock Bajo</div>
     `;
-  });
+    alertas.forEach(a => {
+      html += `
+        <div class="alerta-item">
+          <div>
+            <div class="alerta-producto">${a.producto.nombre}</div>
+            <div class="alerta-deposito">${a.deposito} · ${a.producto.unidad}</div>
+          </div>
+          <div class="alerta-cantidad">${a.cantidad} ${a.producto.unidad}</div>
+        </div>
+      `;
+    });
+  }
+
+  if (totalVencProximos > 0) {
+    html += `
+      <div style="font-size:0.8rem;text-transform:uppercase;letter-spacing:0.08em;color:var(--gris-medio);margin-top:20px;margin-bottom:8px;font-weight:700">Vencimientos Próximos</div>
+    `;
+    alertasVenc.forEach(itemInfo => {
+      const { item, diffDays } = itemInfo;
+      const prod = productos.find(p => p.id === item.productoId);
+      const nombre = prod ? prod.nombre : item.productoId;
+      const unidad = prod ? prod.unidad : "";
+      const depNombre = item.depositoId === "plaza" ? "Plaza" : "La Rioja";
+
+      let descDias = "";
+      if (diffDays < 0) descDias = "Vencido";
+      else if (diffDays === 0) descDias = "Vence hoy";
+      else descDias = `Vence en ${diffDays} días`;
+
+      const showRetirarBtn = STATE.userRole !== "visualizador";
+
+      html += `
+        <div class="alerta-item" style="display:flex;justify-content:space-between;align-items:center">
+          <div>
+            <div class="alerta-producto">${nombre}</div>
+            <div class="alerta-deposito">${depNombre} · ${item.cantidad} ${unidad} · Vence: ${formatFechaDisplay(item.fechaVencimiento)}</div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:end;gap:4px">
+            <span style="font-size:0.9rem;font-weight:700;color:var(--rojo-alerta);white-space:nowrap">${descDias}</span>
+            ${showRetirarBtn ? `
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:2px 6px;font-size:0.7rem;height:auto;min-height:24px;margin-top:2px" onclick="confirmarRetirarLoteDesdeAlertas('${item.depositoId}', '${item.id}')">
+              Retirar
+            </button>` : ''}
+          </div>
+        </div>
+      `;
+    });
+  }
 
   el.innerHTML = html;
 }
+
+window.confirmarRetirarLoteDesdeAlertas = async function(depositoId, id) {
+  if (!confirm("¿Marcar este lote como retirado? Se eliminará del registro.")) return;
+  try {
+    await eliminarVencimiento(depositoId, id);
+    mostrarToast("Lote retirado correctamente", "ok");
+    renderAlertas();
+  } catch (e) {
+    mostrarToast("Error al retirar: " + e.message, "error");
+  }
+};
 
 // =============================================
 // VISTA: HISTORIAL
@@ -986,6 +1102,18 @@ async function renderConfig() {
           min="1" max="999"
           value="${config.umbralAlerta}"
           onchange="actualizarUmbral(this.value)">
+      </div>
+
+      <div class="config-row" style="border-top:1px solid var(--gris-borde)">
+        <div>
+          <div class="config-label">Días de alerta de vencimiento</div>
+          <div class="config-desc">Días antes del vencimiento para activar alerta</div>
+        </div>
+        <input type="number" class="config-input-sm"
+          id="config-dias-vencimiento"
+          min="1" max="365"
+          value="${config.diasAlertaVencimiento ?? 15}"
+          onchange="actualizarDiasVencimiento(this.value)">
       </div>
     </div>
 
@@ -1311,6 +1439,292 @@ async function renderHistorialEntradas(depositoId) {
   }
 }
 
+// =============================================
+// VISTA: VENCIMIENTOS
+// =============================================
+async function renderVencimientos() {
+  const el = document.getElementById("vencimientos-content");
+  if (!el) return;
+
+  el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando vencimientos...</div></div>`;
+
+  try {
+    const vencimientos = await getTodosVencimientos();
+    const productos = getProductosFlat();
+
+    let html = `
+      <button class="btn btn-primario btn-full" style="margin-bottom:16px" onclick="mostrarModalRegistrarVencimiento()">
+        📅 Registrar Lote de Vencimiento
+      </button>
+    `;
+
+    if (vencimientos.length === 0) {
+      html += `<div class="estado-vacio"><div class="vacio-icono">📅</div><div class="vacio-texto">No hay lotes con fecha de vencimiento registrados.</div></div>`;
+      el.innerHTML = html;
+      return;
+    }
+
+    const hoy = new Date();
+    hoy.setHours(0,0,0,0);
+
+    vencimientos.forEach(item => {
+      const prod = productos.find(p => p.id === item.productoId);
+      const nombre = prod ? prod.nombre : item.productoId;
+      const unidad = prod ? prod.unidad : "";
+
+      const fechaVenc = new Date(item.fechaVencimiento + "T00:00:00");
+      fechaVenc.setHours(0,0,0,0);
+
+      const diffTime = fechaVenc - hoy;
+      const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+      let badgeDias = "";
+      if (diffDays < 0) {
+        badgeDias = `<span style="background:var(--rojo-alerta-bg);color:var(--rojo-alerta);padding:4px 8px;border-radius:12px;font-size:0.75rem;font-weight:700">Vencido</span>`;
+      } else if (diffDays === 0) {
+        badgeDias = `<span style="background:var(--rojo-alerta-bg);color:var(--rojo-alerta);padding:4px 8px;border-radius:12px;font-size:0.75rem;font-weight:700">Vence hoy</span>`;
+      } else {
+        const config = getConfig();
+        const diasAlerta = config.diasAlertaVencimiento ?? 15;
+        const color = diffDays <= diasAlerta ? "var(--rojo-alerta)" : "var(--gris-medio)";
+        const bg = diffDays <= diasAlerta ? "var(--rojo-alerta-bg)" : "var(--gris-fondo)";
+        badgeDias = `<span style="background:${bg};color:${color};padding:4px 8px;border-radius:12px;font-size:0.75rem;font-weight:700">${diffDays} días rest.</span>`;
+      }
+
+      const depNombre = item.depositoId === "plaza" ? "Plaza" : "La Rioja";
+      const origenBadge = item.origen === "entrada" 
+        ? `<span style="background:var(--verde-bg);color:var(--verde);padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;margin-left:6px">Entrada</span>` 
+        : `<span style="background:#EBF3FF;color:#0066FF;padding:2px 6px;border-radius:4px;font-size:0.65rem;font-weight:700;text-transform:uppercase;margin-left:6px">Manual</span>`;
+
+      html += `
+        <div class="card" style="padding:14px;margin-bottom:10px;display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center">
+          <div>
+            <div style="font-weight:600;font-size:0.95rem;display:flex;align-items:center;flex-wrap:wrap;gap:4px">
+              ${nombre} ${origenBadge}
+            </div>
+            <div style="font-size:0.8rem;color:var(--gris-medio);margin-top:4px">
+              Cant: <strong>${item.cantidad} ${unidad}</strong> · Dep: <strong>${depNombre}</strong><br>
+              Vence: <strong>${formatFechaDisplay(item.fechaVencimiento)}</strong>
+            </div>
+          </div>
+          <div style="display:flex;flex-direction:column;align-items:end;gap:8px">
+            ${badgeDias}
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:4px 8px;font-size:0.75rem;height:auto;min-height:30px" onclick="confirmarRetirarLote('${item.depositoId}', '${item.id}')">
+              Retirar
+            </button>
+          </div>
+        </div>
+      `;
+    });
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">Error al cargar vencimientos.</div></div>`;
+  }
+}
+
+window.confirmarRetirarLote = async function(depositoId, id) {
+  if (!confirm("¿Marcar este lote como retirado? Se eliminará del registro.")) return;
+  try {
+    await eliminarVencimiento(depositoId, id);
+    mostrarToast("Lote retirado correctamente", "ok");
+    renderVencimientos();
+  } catch (e) {
+    mostrarToast("Error al retirar: " + e.message, "error");
+  }
+};
+
+window.mostrarModalRegistrarVencimiento = function() {
+  const overlay = document.getElementById("modal-overlay");
+  const modal = document.getElementById("modal-content");
+
+  STATE.modalVencimientoProductoSeleccionado = null;
+
+  modal.innerHTML = `
+    <div class="modal-titulo">Registrar Lote de Vencimiento</div>
+
+    <!-- Buscador de producto -->
+    <div class="input-group" style="margin-bottom:12px" id="modal-venc-search-group">
+      <label class="input-label">Buscar producto</label>
+      <input type="text" class="input-field" id="modal-venc-buscador"
+        placeholder="Buscar bebida o categoría..."
+        oninput="filtrarSelectorModalVenc(this.value)">
+    </div>
+
+    <!-- Listado de productos scrollable -->
+    <div id="modal-venc-selector-productos" style="max-height:180px;overflow-y:auto;border:1px solid var(--gris-borde);border-radius:var(--radio-sm);margin-bottom:12px">
+    </div>
+
+    <!-- Producto Seleccionado -->
+    <div id="modal-venc-producto-seleccionado" style="display:none;padding:10px 12px;background:var(--gris-fondo);border-radius:var(--radio-sm);margin-bottom:12px;align-items:center;justify-content:space-between">
+      <div>
+        <div style="font-weight:700;font-size:0.9rem" id="modal-venc-prod-nombre"></div>
+        <div style="font-size:0.75rem;color:var(--gris-medio)" id="modal-venc-prod-unidad"></div>
+      </div>
+      <button onclick="limpiarSeleccionModalVenc()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gris-medio)">✕</button>
+    </div>
+
+    <!-- Cantidad -->
+    <div class="input-group" style="margin-bottom:12px">
+      <label class="input-label" id="modal-venc-cantidad-label">Cantidad</label>
+      <input type="number" class="input-field" id="modal-venc-cantidad" min="1" placeholder="0" inputmode="numeric">
+    </div>
+
+    <!-- Depósito -->
+    <div class="input-group" style="margin-bottom:12px">
+      <label class="input-label">Depósito</label>
+      <select class="input-field" id="modal-venc-deposito">
+        <option value="plaza">Depósito 1 - Plaza</option>
+        <option value="larioja">Depósito 2 - La Rioja</option>
+      </select>
+    </div>
+
+    <!-- Fecha Vencimiento -->
+    <div class="input-group" style="margin-bottom:16px">
+      <label class="input-label">Fecha de vencimiento</label>
+      <input type="date" class="input-field" id="modal-venc-fecha">
+    </div>
+
+    <!-- Info Info -->
+    <div style="padding:10px 12px;background:var(--gris-fondo);border-radius:var(--radio-sm);margin-bottom:16px;font-size:0.8rem;color:var(--gris-medio)">
+      📅 Fecha: <strong>${formatFechaDisplay(formatFecha(new Date()))}</strong> &nbsp;&nbsp; 👤 Resp: <strong>${STATE.responsable}</strong>
+    </div>
+
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn btn-secundario" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primario" onclick="guardarVencimientoManualUI()">Guardar</button>
+    </div>
+  `;
+
+  renderSelectorProductosModalVenc("");
+  overlay.classList.add("visible");
+};
+
+function renderSelectorProductosModalVenc(filtro) {
+  const el = document.getElementById("modal-venc-selector-productos");
+  if (!el) return;
+
+  const query = filtro.toLowerCase().trim();
+  const productos = getProductosFlat();
+  const categorias = getCategorias();
+
+  let html = "";
+  categorias.forEach(cat => {
+    const prodsCat = productos.filter(p => p.categoria === cat);
+    const visibles = prodsCat.filter(p => {
+      if (!query) return true;
+      return (`${cat} ${p.nombre} ${p.marca} ${p.variante}`).toLowerCase().includes(query);
+    });
+    if (visibles.length === 0) return;
+
+    html += `<div style="padding:4px 8px;font-size:0.65rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);background:var(--gris-fondo);position:sticky;top:0">${cat}</div>`;
+    visibles.forEach(p => {
+      const nombre = p.nombre.replace(/'/g, "&#39;");
+      const unidad = p.unidad.replace(/'/g, "&#39;");
+      html += `
+        <div onclick="seleccionarProductoModalVenc('${p.id}', '${nombre}', '${unidad}')"
+          style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-fondo);font-size:0.85rem;display:flex;justify-content:space-between;align-items:center"
+          onmouseover="this.style.background='var(--gris-fondo)'" onmouseout="this.style.background=''">
+          <span>${p.nombre}</span>
+          <span style="font-size:0.7rem;color:var(--gris-medio)">${p.unidad}</span>
+        </div>
+      `;
+    });
+  });
+
+  if (!html) {
+    html = `<div style="padding:12px;text-align:center;color:var(--gris-medio);font-size:0.8rem">Sin resultados</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+window.filtrarSelectorModalVenc = function(texto) {
+  renderSelectorProductosModalVenc(texto);
+};
+
+window.seleccionarProductoModalVenc = function(prodId, nombre, unidad) {
+  STATE.modalVencimientoProductoSeleccionado = { id: prodId, nombre, unidad };
+
+  document.getElementById("modal-venc-selector-productos").style.display = "none";
+  document.getElementById("modal-venc-search-group").style.display = "none";
+
+  const selEl = document.getElementById("modal-venc-producto-seleccionado");
+  selEl.style.display = "flex";
+  document.getElementById("modal-venc-prod-nombre").textContent = nombre;
+  document.getElementById("modal-venc-prod-unidad").textContent = unidad;
+
+  const label = document.getElementById("modal-venc-cantidad-label");
+  if (label) {
+    let unidadPlural = unidad;
+    if (unidad === "pack") unidadPlural = "packs";
+    else if (unidad === "caja") unidadPlural = "cajas";
+    else if (unidad === "bot") unidadPlural = "botellas";
+    else if (unidad === "ud") unidadPlural = "unidades";
+    label.innerHTML = `Cantidad <span style="color:var(--dorado);font-weight:700;text-transform:lowercase">(${unidadPlural})</span>`;
+  }
+
+  document.getElementById("modal-venc-cantidad").focus();
+};
+
+window.limpiarSeleccionModalVenc = function() {
+  STATE.modalVencimientoProductoSeleccionado = null;
+  document.getElementById("modal-venc-producto-seleccionado").style.display = "none";
+  document.getElementById("modal-venc-selector-productos").style.display = "block";
+  document.getElementById("modal-venc-search-group").style.display = "block";
+  document.getElementById("modal-venc-buscador").value = "";
+
+  const label = document.getElementById("modal-venc-cantidad-label");
+  if (label) {
+    label.textContent = "Cantidad";
+  }
+
+  renderSelectorProductosModalVenc("");
+};
+
+window.guardarVencimientoManualUI = async function() {
+  const prod = STATE.modalVencimientoProductoSeleccionado;
+  const cantidadEl = document.getElementById("modal-venc-cantidad");
+  const depositoEl = document.getElementById("modal-venc-deposito");
+  const fechaEl = document.getElementById("modal-venc-fecha");
+
+  if (!prod) return mostrarToast("Seleccioná un producto", "error");
+  if (!cantidadEl.value || Number(cantidadEl.value) <= 0) return mostrarToast("Ingresá una cantidad válida", "error");
+  if (!fechaEl.value) return mostrarToast("Ingresá la fecha de vencimiento", "error");
+
+  const btn = document.querySelector("#modal-content .btn-primario");
+  const oldText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Guardando...`;
+
+  try {
+    const res = await guardarVencimientoManual(
+      depositoEl.value,
+      prod.id,
+      Number(cantidadEl.value),
+      fechaEl.value,
+      STATE.responsable
+    );
+
+    cerrarModal();
+    if (res && res.offline) {
+      mostrarToast("📅 Lote guardado offline. Se sincronizará al reconectar.", "ok");
+    } else {
+      mostrarToast("Lote de vencimiento registrado", "ok");
+    }
+    
+    if (STATE.vistaActual === "vencimientos") {
+      renderVencimientos();
+    }
+    renderDashboard();
+  } catch (e) {
+    mostrarToast("Error al guardar: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+};
+
 async function cargarUsuariosPendientes() {
   const el = document.getElementById("lista-usuarios-pendientes");
   if (!el) return;
@@ -1381,6 +1795,16 @@ function actualizarUmbral(valor) {
   setConfig(config);
   STATE.config = config;
   mostrarToast(`Umbral actualizado a ${n} unidades`, "ok");
+}
+
+function actualizarDiasVencimiento(valor) {
+  const n = parseInt(valor);
+  if (isNaN(n) || n < 1) return;
+  const config = getConfig();
+  config.diasAlertaVencimiento = n;
+  setConfig(config);
+  STATE.config = config;
+  mostrarToast(`Alerta de vencimiento establecida en ${n} días`, "ok");
 }
 
 async function forzarSync() {
