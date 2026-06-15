@@ -81,6 +81,26 @@ async function initApp() {
             // Verificar si está en pendientes
             const pendingSnap = await db.ref(`usuarios_pendientes/${user.uid}`).once("value");
             if (pendingSnap.exists()) {
+              const pendingData = pendingSnap.val();
+              // AUTO PROMOVER AL DUEÑO SIN IMPORTAR NADA
+              if (user.email === "prof.pabloliva@gmail.com" || user.email === "profe.olivapablo@gmail.com") {
+                await db.ref(`usuarios/${user.uid}`).set({
+                  email: user.email,
+                  nombre: user.displayName || pendingData.nombre || "",
+                  role: "admin"
+                });
+                await db.ref(`usuarios_pendientes/${user.uid}`).remove();
+                
+                STATE.userRole = "admin";
+                STATE.responsable = user.displayName || pendingData.nombre || user.email;
+                authContainer.style.display = "none";
+                appContainer.style.display = "block";
+                ajustarInterfazPorRol();
+                await renderDashboard();
+                navegarA("dashboard");
+                return;
+              }
+              
               mostrarAuthVista("auth-pending");
               authContainer.style.display = "flex";
               appContainer.style.display = "none";
@@ -203,27 +223,38 @@ function ajustarInterfazPorRol() {
   const navCargar = document.querySelector(`.nav-item[data-vista="cargar"]`);
   const navHistorial = document.querySelector(`.nav-item[data-vista="historial"]`);
   const navConfig = document.querySelector(`.nav-item[data-vista="config"]`);
+  const navEntradas = document.querySelector(`.nav-item[data-vista="entradas"]`);
 
   if (STATE.userRole === "visualizador") {
-    if(navCargar) navCargar.style.display = "none";
+    if(navCargar) {
+      navCargar.style.display = "flex";
+      navCargar.innerHTML = `<span class="nav-icon">📊</span>Ver Stock`;
+    }
     if(navHistorial) navHistorial.style.display = "none";
     if(navConfig) navConfig.style.display = "none";
-  } else if (STATE.userRole === "editor") {
-    if(navCargar) navCargar.style.display = "flex";
-    if(navHistorial) navHistorial.style.display = "flex";
-    if(navConfig) navConfig.style.display = "none";
+    if(navEntradas) navEntradas.style.display = "none";
   } else {
-    // Admin
-    if(navCargar) navCargar.style.display = "flex";
-    if(navHistorial) navHistorial.style.display = "flex";
-    if(navConfig) navConfig.style.display = "flex";
+    if(navCargar) {
+      navCargar.style.display = "flex";
+      navCargar.innerHTML = `<span class="nav-icon">📦</span>Cargar`;
+    }
+    if (STATE.userRole === "editor") {
+      if(navHistorial) navHistorial.style.display = "flex";
+      if(navConfig) navConfig.style.display = "none";
+      if(navEntradas) navEntradas.style.display = "flex";
+    } else {
+      // Admin
+      if(navHistorial) navHistorial.style.display = "flex";
+      if(navConfig) navConfig.style.display = "flex";
+      if(navEntradas) navEntradas.style.display = "flex";
+    }
   }
 }
 
 // --- Navegación ---
 function navegarA(vista) {
   // Bloquear acceso a visualizadores
-  if (STATE.userRole === "visualizador" && ["cargar", "historial", "config"].includes(vista)) {
+  if (STATE.userRole === "visualizador" && ["historial", "config", "entradas"].includes(vista)) {
     return mostrarToast("No tienes permisos para ver esta sección", "error");
   }
   // Bloquear acceso a editores a config
@@ -253,6 +284,7 @@ function navegarA(vista) {
     case "alertas": renderAlertas(); break;
     case "historial": renderHistorial(); break;
     case "config": renderConfig(); break;
+    case "entradas": renderEntradas(); break;
   }
 }
 
@@ -331,12 +363,16 @@ async function renderDashboard() {
           </div>
         </div>
       </div>
+      ${STATE.userRole === "visualizador" ? `
+      <button class="btn btn-dorado btn-full" style="margin-bottom:10px;font-size:1rem;padding:18px" onclick="navegarA('cargar')">
+        📊 Ver Stock Actual
+      </button>` : `
       <button class="btn btn-dorado btn-full" style="margin-bottom:10px;font-size:1rem;padding:18px" onclick="navegarA('cargar')">
         📦 Cargar Stock
       </button>
       <button class="btn btn-secundario btn-full" onclick="navegarA('historial')">
         📋 Ver Historial
-      </button>
+      </button>`}
     `;
   } catch (e) {
     el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">❌</div><div class="vacio-texto">Error al cargar datos.<br>Verificá la conexión.</div></div>`;
@@ -349,6 +385,20 @@ async function renderDashboard() {
 function renderCargar() {
   const el = document.getElementById("cargar-content");
   if (!el) return;
+
+  // Ajustar títulos para visualizador
+  const mainCargar = document.getElementById("vista-cargar");
+  if (mainCargar) {
+    const titulo = mainCargar.querySelector(".vista-titulo");
+    const subtitulo = mainCargar.querySelector(".vista-subtitulo");
+    if (STATE.userRole === "visualizador") {
+      if (titulo) titulo.textContent = "Ver Stock";
+      if (subtitulo) subtitulo.textContent = "Consulta el stock en vivo";
+    } else {
+      if (titulo) titulo.textContent = "Cargar Stock";
+      if (subtitulo) subtitulo.textContent = "Registrá el conteo actual";
+    }
+  }
 
   STATE.depositoSeleccionado = null;
   STATE.stockCargando = {};
@@ -373,11 +423,12 @@ function renderCargar() {
         <input type="text" class="input-field" id="input-buscador" placeholder="Buscar bebida o categoría..." oninput="filtrarProductos(this.value)">
       </div>
       <div id="lista-productos"></div>
+      ${STATE.userRole !== "visualizador" ? `
       <div style="position:sticky;bottom:calc(var(--nav-height) + 12px);padding:12px 0;background:var(--gris-fondo)">
         <button class="btn btn-primario btn-full" onclick="confirmarGuardar()" id="btn-guardar">
           Guardar Stock
         </button>
-      </div>
+      </div>` : ''}
     </div>
   `;
 }
@@ -473,6 +524,7 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
                   placeholder="0"
                   value="${valorPrevio}"
                   inputmode="numeric"
+                  ${STATE.userRole === "visualizador" ? 'disabled' : ''}
                   oninput="STATE.stockCargando['${p.id}'] = this.value">
               </div>
               ${tieneSueltas ? `
@@ -485,6 +537,7 @@ function renderListaProductos(stockPrevio, valoresGuardados = null) {
                   placeholder="0"
                   value="${sueltasPrevio}"
                   inputmode="numeric"
+                  ${STATE.userRole === "visualizador" ? 'disabled' : ''}
                   oninput="handleSueltasInput(this, '${p.id}', '${idSueltas}', ${packSize !== null ? packSize : 'null'})">
               </div>` : ''}
             </div>
@@ -982,6 +1035,262 @@ async function renderConfig() {
     `;
     el.appendChild(adminSection);
     cargarUsuariosPendientes();
+  }
+}
+
+// =============================================
+// VISTA: ENTRADA DE MERCADERÍA
+// =============================================
+function renderEntradas() {
+  const el = document.getElementById("entradas-content");
+  if (!el) return;
+
+  STATE.entradaDepositoSeleccionado = null;
+  STATE.entradaProductoSeleccionado = null;
+
+  el.innerHTML = `
+    <div class="card-titulo" style="margin-bottom:10px">Seleccioná el depósito</div>
+    <div class="deposito-selector" id="deposito-selector-entrada">
+      <button class="deposito-btn" onclick="seleccionarDepositoEntrada('plaza')" id="dep-entrada-plaza">
+        <span class="dep-nombre">Depósito 1</span>
+        <span class="dep-titulo">Plaza</span>
+      </button>
+      <button class="deposito-btn" onclick="seleccionarDepositoEntrada('larioja')" id="dep-entrada-larioja">
+        <span class="dep-nombre">Depósito 2</span>
+        <span class="dep-titulo">La Rioja</span>
+      </button>
+    </div>
+
+    <div id="formulario-entrada" style="display:none">
+      <div class="card" style="margin-bottom:12px">
+        <div class="card-titulo" style="margin-bottom:12px">Registrar Ingreso</div>
+
+        <div class="input-group" style="margin-bottom:12px">
+          <label class="input-label">Buscar producto</label>
+          <input type="text" class="input-field" id="entrada-buscador"
+            placeholder="Buscar bebida o categoría..."
+            oninput="filtrarSelectorEntrada(this.value)">
+        </div>
+
+        <div id="entrada-selector-productos" style="max-height:220px;overflow-y:auto;border:1px solid var(--gris-borde);border-radius:var(--radio-sm);margin-bottom:12px">
+        </div>
+
+        <div id="entrada-producto-seleccionado" style="display:none;padding:10px 12px;background:var(--gris-fondo);border-radius:var(--radio-sm);margin-bottom:12px;display:none;align-items:center;justify-content:space-between">
+          <div>
+            <div style="font-weight:700;font-size:0.95rem" id="entrada-prod-nombre"></div>
+            <div style="font-size:0.78rem;color:var(--gris-medio)" id="entrada-prod-unidad"></div>
+          </div>
+          <button onclick="limpiarSeleccionEntrada()" style="background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gris-medio)">✕</button>
+        </div>
+
+        <div class="input-group" style="margin-bottom:12px">
+          <label class="input-label">Cantidad que ingresa</label>
+          <input type="number" class="input-field" id="entrada-cantidad"
+            min="1" placeholder="0" inputmode="numeric"
+            style="font-size:1.6rem;font-weight:700;text-align:center;height:60px">
+        </div>
+
+        <div class="input-group" style="margin-bottom:16px">
+          <label class="input-label">Fecha de vencimiento <span style="color:var(--gris-medio);font-weight:400">(opcional)</span></label>
+          <input type="date" class="input-field" id="entrada-vencimiento">
+        </div>
+
+        <div style="padding:10px 12px;background:var(--gris-fondo);border-radius:var(--radio-sm);margin-bottom:16px;font-size:0.85rem;color:var(--gris-medio)">
+          📅 Fecha: <strong style="color:var(--negro)" id="entrada-fecha-hoy"></strong> &nbsp;&nbsp; 👤 Responsable: <strong style="color:var(--negro)">${STATE.responsable}</strong>
+        </div>
+
+        <button class="btn btn-primario btn-full" id="btn-registrar-entrada" onclick="registrarEntrada()">
+          📥 Registrar Entrada
+        </button>
+      </div>
+
+      <div class="card">
+        <div class="card-titulo" style="margin-bottom:12px">Historial de Entradas</div>
+        <div id="historial-entradas-content">
+          <div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando...</div></div>
+        </div>
+      </div>
+    </div>
+  `;
+
+  // Mostrar fecha de hoy
+  const hoy = document.getElementById("entrada-fecha-hoy");
+  if (hoy) hoy.textContent = formatFechaDisplay(formatFecha(new Date()));
+}
+
+async function seleccionarDepositoEntrada(depositoId) {
+  STATE.entradaDepositoSeleccionado = depositoId;
+  STATE.entradaProductoSeleccionado = null;
+
+  document.querySelectorAll("#deposito-selector-entrada .deposito-btn").forEach(b => b.classList.remove("seleccionado"));
+  document.getElementById(`dep-entrada-${depositoId}`).classList.add("seleccionado");
+  document.getElementById("formulario-entrada").style.display = "block";
+
+  // Renderizar selector de productos
+  renderSelectorProductosEntrada("");
+
+  // Cargar historial de entradas
+  await renderHistorialEntradas(depositoId);
+}
+
+function renderSelectorProductosEntrada(filtro) {
+  const el = document.getElementById("entrada-selector-productos");
+  if (!el) return;
+
+  const query = filtro.toLowerCase().trim();
+  const productos = getProductosFlat();
+  const categorias = getCategorias();
+
+  let html = "";
+  categorias.forEach(cat => {
+    const prodsCat = productos.filter(p => p.categoria === cat);
+    const visibles = prodsCat.filter(p => {
+      if (!query) return true;
+      return (`${cat} ${p.nombre} ${p.marca} ${p.variante}`).toLowerCase().includes(query);
+    });
+    if (visibles.length === 0) return;
+
+    html += `<div style="padding:6px 12px;font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);background:var(--gris-fondo);position:sticky;top:0">${cat}</div>`;
+    visibles.forEach(p => {
+      const nombre = p.nombre.replace(/'/g, "&#39;");
+      const unidad = p.unidad.replace(/'/g, "&#39;");
+      html += `
+        <div onclick="seleccionarProductoEntrada('${p.id}', '${nombre}', '${unidad}')"
+          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gris-fondo);font-size:0.9rem;display:flex;justify-content:space-between;align-items:center"
+          onmouseover="this.style.background='var(--gris-fondo)'" onmouseout="this.style.background=''">
+          <span>${p.nombre}</span>
+          <span style="font-size:0.75rem;color:var(--gris-medio)">${p.unidad}</span>
+        </div>
+      `;
+    });
+  });
+
+  if (!html) {
+    html = `<div style="padding:16px;text-align:center;color:var(--gris-medio);font-size:0.88rem">Sin resultados</div>`;
+  }
+
+  el.innerHTML = html;
+}
+
+window.filtrarSelectorEntrada = function(texto) {
+  renderSelectorProductosEntrada(texto);
+};
+
+window.seleccionarProductoEntrada = function(prodId, nombre, unidad) {
+  STATE.entradaProductoSeleccionado = { id: prodId, nombre, unidad };
+
+  // Ocultar selector, mostrar producto elegido
+  document.getElementById("entrada-selector-productos").style.display = "none";
+  document.getElementById("entrada-buscador").style.display = "none";
+
+  const selEl = document.getElementById("entrada-producto-seleccionado");
+  selEl.style.display = "flex";
+  document.getElementById("entrada-prod-nombre").textContent = nombre;
+  document.getElementById("entrada-prod-unidad").textContent = unidad;
+
+  document.getElementById("entrada-cantidad").focus();
+};
+
+window.limpiarSeleccionEntrada = function() {
+  STATE.entradaProductoSeleccionado = null;
+  document.getElementById("entrada-producto-seleccionado").style.display = "none";
+  document.getElementById("entrada-selector-productos").style.display = "block";
+  document.getElementById("entrada-buscador").style.display = "block";
+  document.getElementById("entrada-buscador").value = "";
+  renderSelectorProductosEntrada("");
+};
+
+async function registrarEntrada() {
+  const depositoId = STATE.entradaDepositoSeleccionado;
+  const producto = STATE.entradaProductoSeleccionado;
+  const cantidadEl = document.getElementById("entrada-cantidad");
+  const vencimientoEl = document.getElementById("entrada-vencimiento");
+
+  if (!depositoId) return mostrarToast("Seleccioná un depósito", "error");
+  if (!producto) return mostrarToast("Seleccioná un producto", "error");
+  if (!cantidadEl.value || Number(cantidadEl.value) <= 0) return mostrarToast("Ingresá una cantidad válida", "error");
+
+  const btn = document.getElementById("btn-registrar-entrada");
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Registrando...`;
+
+  try {
+    const res = await guardarEntrada(
+      depositoId,
+      producto.id,
+      Number(cantidadEl.value),
+      vencimientoEl.value || null,
+      STATE.responsable
+    );
+
+    if (res.offline) {
+      mostrarToast("📥 Entrada guardada offline. Se sincronizará al reconectar.", "ok");
+    } else {
+      mostrarToast(`✅ +${cantidadEl.value} ${producto.unidad} de ${producto.nombre} registrados`, "ok");
+    }
+
+    // Limpiar formulario
+    cantidadEl.value = "";
+    vencimientoEl.value = "";
+    limpiarSeleccionEntrada();
+
+    // Recargar historial
+    await renderHistorialEntradas(depositoId);
+
+    // Actualizar dashboard en background
+    renderDashboard();
+
+  } catch (e) {
+    mostrarToast("Error al registrar: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = "📥 Registrar Entrada";
+  }
+}
+
+async function renderHistorialEntradas(depositoId) {
+  const el = document.getElementById("historial-entradas-content");
+  if (!el) return;
+
+  el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando...</div></div>`;
+
+  try {
+    const entradas = await getEntradas(depositoId);
+    const productos = getProductosFlat();
+
+    if (entradas.length === 0) {
+      el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">📥</div><div class="vacio-texto">No hay entradas registradas aún.</div></div>`;
+      return;
+    }
+
+    const depNombre = depositoId === "plaza" ? "Depósito 1 - Plaza" : "Depósito 2 - La Rioja";
+    let html = `<div style="font-size:0.72rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);margin-bottom:10px;font-weight:700">${depNombre}</div>`;
+
+    entradas.forEach(entrada => {
+      const prod = productos.find(p => p.id === entrada.productoId);
+      const nombre = prod ? prod.nombre : entrada.productoId;
+      const unidad = prod ? prod.unidad : "";
+      const fechaDisplay = entrada.fecha ? formatFechaDisplay(entrada.fecha) : "-";
+      const vencDisplay = entrada.fechaVencimiento
+        ? ` · Vence: <strong>${formatFechaDisplay(entrada.fechaVencimiento)}</strong>`
+        : "";
+
+      html += `
+        <div style="padding:12px 0;border-bottom:1px solid var(--gris-fondo);display:grid;grid-template-columns:1fr auto;gap:8px;align-items:start">
+          <div>
+            <div style="font-weight:600;font-size:0.9rem">${nombre}</div>
+            <div style="font-size:0.75rem;color:var(--gris-medio);margin-top:2px">
+              ${fechaDisplay} · ${entrada.responsable}${vencDisplay}
+            </div>
+          </div>
+          <div style="font-size:1.1rem;font-weight:700;color:var(--verde);white-space:nowrap">+${entrada.cantidad} ${unidad}</div>
+        </div>
+      `;
+    });
+
+    el.innerHTML = html;
+  } catch (e) {
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">Error al cargar historial.</div></div>`;
   }
 }
 

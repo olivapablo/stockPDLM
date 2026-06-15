@@ -10,7 +10,8 @@ const FIREBASE_CONFIG = {
   projectId: "stock-plaza",
   storageBucket: "stock-plaza.firebasestorage.app",
   messagingSenderId: "1055032939567",
-  appId: "1:1055032939567:web:24a3ac2ff9b23cdc8322da"
+  appId: "1:1055032939567:web:24a3ac2ff9b23cdc8322da",
+  measurementId: "G-6ZP4BN6EP8"
 };
 
 // Inicializar Firebase
@@ -67,7 +68,43 @@ async function syncOfflineQueue() {
 
   for (const entry of queue) {
     try {
-      await db.ref(`stock/${entry.depositoId}/${entry.fecha}/${entry.productoId}`).set(entry);
+      if (entry.tipo === "entrada") {
+        // Procesar entrada offline: leer stock actual y sumar
+        const snap = await db.ref(`stock_actual/${entry.depositoId}/${entry.productoId}`).get();
+        const cantActual = snap.exists() ? (snap.val().cantidad || 0) : 0;
+        const cantNueva = cantActual + Number(entry.cantidad);
+
+        await db.ref(`stock_actual/${entry.depositoId}/${entry.productoId}`).set({
+          cantidad: cantNueva,
+          ultimaActualizacion: new Date().toISOString()
+        });
+
+        const registroEntrada = {
+          productoId: entry.productoId,
+          cantidad: Number(entry.cantidad),
+          fechaVencimiento: entry.fechaVencimiento || null,
+          fecha: entry.fecha,
+          responsable: entry.responsable,
+          timestamp: entry.timestamp
+        };
+        await db.ref(`entradas/${entry.depositoId}`).push(registroEntrada);
+
+        if (entry.fechaVencimiento) {
+          await db.ref(`vencimientos/${entry.depositoId}`).push({
+            ...registroEntrada,
+            fechaRegistro: entry.fecha,
+            origen: "entrada"
+          });
+        }
+      } else {
+        // Conteo semanal normal
+        await db.ref(`stock/${entry.depositoId}/${entry.fecha}/${entry.productoId}`).set(entry);
+        // También actualiza stock_actual
+        await db.ref(`stock_actual/${entry.depositoId}/${entry.productoId}`).set({
+          cantidad: Number(entry.cantidad),
+          ultimaActualizacion: entry.timestamp
+        });
+      }
     } catch (e) {
       console.error("Error sincronizando:", e);
       return;
@@ -107,8 +144,79 @@ async function guardarStock(depositoId, productoId, cantidad, responsable) {
     return { offline: true };
   }
 
+  // Guardar snapshot semanal (inmutable)
   await db.ref(`stock/${depositoId}/${fecha}/${productoId}`).set(entry);
+
+  // Sobreescribir stock_actual con el conteo físico real
+  await db.ref(`stock_actual/${depositoId}/${productoId}`).set({
+    cantidad: Number(cantidad),
+    ultimaActualizacion: timestamp
+  });
+
   return { offline: false };
+}
+
+// Nueva función: Registrar Entrada de Mercadería
+async function guardarEntrada(depositoId, productoId, cantidad, fechaVencimiento, responsable) {
+  const ahora = new Date();
+  const fecha = formatFecha(ahora);
+  const timestamp = ahora.toISOString();
+
+  if (!navigator.onLine) {
+    addToOfflineQueue({
+      tipo: "entrada",
+      depositoId,
+      productoId,
+      cantidad: Number(cantidad),
+      fechaVencimiento: fechaVencimiento || null,
+      responsable,
+      fecha,
+      timestamp
+    });
+    return { offline: true };
+  }
+
+  // Leer stock actual y sumar
+  const snap = await db.ref(`stock_actual/${depositoId}/${productoId}`).get();
+  const cantActual = snap.exists() ? (snap.val().cantidad || 0) : 0;
+  const cantNueva = cantActual + Number(cantidad);
+
+  // Actualizar stock_actual sumando
+  await db.ref(`stock_actual/${depositoId}/${productoId}`).set({
+    cantidad: cantNueva,
+    ultimaActualizacion: timestamp
+  });
+
+  // Registro en /entradas
+  const registroEntrada = {
+    productoId,
+    cantidad: Number(cantidad),
+    fechaVencimiento: fechaVencimiento || null,
+    fecha,
+    responsable,
+    timestamp
+  };
+  await db.ref(`entradas/${depositoId}`).push(registroEntrada);
+
+  // Si tiene fecha de vencimiento, registrar en /vencimientos
+  if (fechaVencimiento) {
+    await db.ref(`vencimientos/${depositoId}`).push({
+      ...registroEntrada,
+      fechaRegistro: fecha,
+      origen: "entrada"
+    });
+  }
+
+  return { offline: false };
+}
+
+async function getEntradas(depositoId) {
+  const snap = await db.ref(`entradas/${depositoId}`).get();
+  if (!snap.exists()) return [];
+  const obj = snap.val();
+  return Object.entries(obj)
+    .map(([id, val]) => ({ id, ...val }))
+    .sort((a, b) => (b.timestamp || "").localeCompare(a.timestamp || ""));
 }
 
 async function getStockPorFecha(depositoId, fecha) {
@@ -122,7 +230,19 @@ async function getFechasDisponibles(depositoId) {
   return Object.keys(snap.val()).sort().reverse();
 }
 
+// Lee de /stock_actual. Si no existe, cae al último snapshot de /stock (retrocompatibilidad)
 async function getStockActual(depositoId) {
+  const snap = await db.ref(`stock_actual/${depositoId}`).get();
+  if (snap.exists()) {
+    // Convertir formato {cantidad, ultimaActualizacion} al formato esperado {productoId: {cantidad}}
+    const raw = snap.val();
+    const result = {};
+    Object.entries(raw).forEach(([prodId, data]) => {
+      result[prodId] = { cantidad: data.cantidad };
+    });
+    return result;
+  }
+  // Fallback: leer del último snapshot semanal (datos existentes antes de esta versión)
   const fechas = await getFechasDisponibles(depositoId);
   if (fechas.length === 0) return {};
   return await getStockPorFecha(depositoId, fechas[0]);
@@ -149,4 +269,8 @@ function formatFechaDisplay(fechaStr) {
 // =============================================
 async function resetAppFabrica() {
   await db.ref("stock").remove();
+  await db.ref("stock_actual").remove();
+  await db.ref("entradas").remove();
+  await db.ref("vencimientos").remove();
 }
+

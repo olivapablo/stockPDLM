@@ -4,15 +4,27 @@
       ".read": "auth != null",
       ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || root.child('usuarios').child(auth.uid).child('role').val() == 'editor')"
     },
+    "stock_actual": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || root.child('usuarios').child(auth.uid).child('role').val() == 'editor')"
+    },
+    "entradas": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || root.child('usuarios').child(auth.uid).child('role').val() == 'editor')"
+    },
+    "vencimientos": {
+      ".read": "auth != null",
+      ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || root.child('usuarios').child(auth.uid).child('role').val() == 'editor')"
+    },
     "usuarios": {
       ".read": "auth != null",
-      ".write": "auth != null && root.child('usuarios').child(auth.uid).child('role').val() == 'admin'"
+      ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || auth.token.email == 'prof.pabloliva@gmail.com' || auth.token.email == 'profe.olivapablo@gmail.com')"
     },
     "usuarios_pendientes": {
       ".read": "auth != null && root.child('usuarios').child(auth.uid).child('role').val() == 'admin'",
       "$uid": {
         ".read": "auth != null && auth.uid == $uid",
-        ".write": "auth != null && (root.child('usuarios').child(auth.uid).child('role').val() == 'admin' || (auth.uid == $uid && !data.exists()))"
+        ".write": "auth != null"
       }
     }
   }
