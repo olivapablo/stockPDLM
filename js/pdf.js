@@ -143,7 +143,7 @@ async function exportarPDF(fecha) {
       // Sueltas solo para pack/caja
       if (p.unidad === "pack" || p.unidad === "caja") {
         const sueltas = totalesSueltas[p.id];
-        doc.text(sueltas > 0 ? String(sueltas) : "—", colSueltas, y + 4);
+        doc.text(sueltas !== null ? String(sueltas) : "—", colSueltas, y + 4);
       } else {
         doc.text("—", colSueltas, y + 4);
       }

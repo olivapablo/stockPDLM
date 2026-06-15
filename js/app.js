@@ -297,7 +297,7 @@ window.abrirMenuMas = function() {
     </div>
   `;
 
-  if (STATE.userRole === "admin") {
+  if (STATE.userRole === "admin" || STATE.userRole === "editor") {
     optionsHTML += `
       <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('config')">
         <span class="bottom-sheet-row-icon">⚙️</span>
@@ -334,10 +334,6 @@ function navegarA(vista) {
   }
   // Bloquear acceso a consumo para no-visualizadores (admin y editor)
   if (STATE.userRole !== "visualizador" && vista === "consumo") {
-    return mostrarToast("No tienes permisos para ver esta sección", "error");
-  }
-  // Bloquear acceso a editores a config
-  if (STATE.userRole === "editor" && vista === "config") {
     return mostrarToast("No tienes permisos para ver esta sección", "error");
   }
 
@@ -823,12 +819,15 @@ function mostrarModalExito(fecha, guardados, hayOffline) {
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
       <button class="btn btn-dorado btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="descargarPDF('${fecha}');cerrarModal()">
-        📄 Exportar
+        📄 PDF
       </button>
-      <button class="btn btn-primario btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="compartirPDF('${fecha}')">
-        📤 Compartir
+      <button class="btn btn-primario btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="exportarExcel('${fecha}');cerrarModal()">
+        🟢 Excel
       </button>
     </div>
+    <button class="btn btn-secundario btn-full" style="margin-bottom:12px" onclick="compartirPDF('${fecha}')">
+      📤 Compartir PDF
+    </button>
     <button class="btn btn-secundario btn-full" onclick="cerrarModal();navegarA('dashboard')">
       Volver al inicio
     </button>
@@ -1134,10 +1133,13 @@ async function renderComparacion() {
       <button class="btn btn-secundario btn-sm" onclick="descargarPDF('${a}')">
         ⬇️ Descargar PDF
       </button>
-      <button class="btn btn-dorado btn-sm" onclick="compartirPDF('${a}')">
-        📤 Compartir
+      <button class="btn btn-primario btn-sm" onclick="exportarExcel('${a}')">
+        🟢 Descargar Excel
       </button>
     </div>
+    <button class="btn btn-dorado btn-full" style="margin-top:8px" onclick="compartirPDF('${a}')">
+      📤 Compartir PDF
+    </button>
   `;
 
   panel.innerHTML = html;
@@ -1208,13 +1210,14 @@ async function renderConfig() {
 
     <div class="card">
       <div class="card-titulo">Datos</div>
-      <div class="config-row">
+      <div class="config-row" style="${STATE.userRole !== 'admin' ? 'border-bottom:none' : ''}">
         <div>
           <div class="config-label">Sincronización offline</div>
           <div class="config-desc" id="sync-status">Verificando...</div>
         </div>
         <button class="btn btn-secundario btn-sm" onclick="forzarSync()">Sincronizar</button>
       </div>
+      ${STATE.userRole === "admin" ? `
       <div class="config-row" style="border-top:1px solid var(--gris-borde)">
         <div>
           <div class="config-label">Migrar último conteo a stock actual</div>
@@ -1229,6 +1232,7 @@ async function renderConfig() {
         </div>
         <button class="btn btn-sm" style="background:var(--rojo-alerta-bg);color:var(--rojo-alerta);border:1.5px solid var(--rojo-alerta);font-weight:700" onclick="solicitarResetFabrica()">Resetear</button>
       </div>
+      ` : ''}
     </div>
   `;
 
@@ -2458,6 +2462,8 @@ window.filtrarProductosVerStock = function(texto) {
 // VISTA: CONSUMO (GRÁFICOS DE ANÁLISIS)
 // =============================================
 STATE.consumoPeriodo = "semana";
+STATE.consumoCategoria = "todas";
+STATE.consumoProducto = "todos";
 STATE.consumoRawData = null;
 
 async function renderConsumo() {
@@ -2516,6 +2522,8 @@ async function renderConsumo() {
     // Guardar datos en el estado para evitar recargar
     STATE.consumoRawData = { fechas, plazaStock, lariojaStock, entriesList };
 
+    const categorias = getCategorias();
+
     // Render container layout
     el.innerHTML = `
       <div class="period-tabs-container">
@@ -2526,9 +2534,30 @@ async function renderConsumo() {
           <button class="period-tab ${STATE.consumoPeriodo === 'semestre' ? 'active' : ''}" data-periodo="semestre" onclick="cambiarPeriodoConsumo('semestre')">6 Meses</button>
         </div>
       </div>
+
+      <div class="card" style="margin-bottom: 12px; padding: 14px 16px;">
+        <div class="card-titulo" style="margin-bottom: 12px; font-size: 0.85rem; letter-spacing: 0.05em;">Filtros de Bebidas</div>
+        <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
+          <div>
+            <label class="input-label" style="margin-bottom: 4px; display: block; font-size: 0.65rem;">Categoría</label>
+            <select id="consumo-filtro-categoria" onchange="cambiarFiltroCategoriaConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--negro); font-family: inherit;">
+              <option value="todas" ${STATE.consumoCategoria === 'todas' ? 'selected' : ''}>Todas</option>
+              ${categorias.map(cat => `<option value="${cat}" ${STATE.consumoCategoria === cat ? 'selected' : ''}>${cat}</option>`).join('')}
+            </select>
+          </div>
+          <div>
+            <label class="input-label" style="margin-bottom: 4px; display: block; font-size: 0.65rem;">Bebida</label>
+            <select id="consumo-filtro-producto" onchange="cambiarFiltroProductoConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--negro); font-family: inherit;">
+              <!-- Se poblará dinámicamente -->
+            </select>
+          </div>
+        </div>
+      </div>
+
       <div id="consumo-charts-container"></div>
     `;
 
+    poblarSelectorProductosConsumo();
     renderConsumoCharts();
 
   } catch (e) {
@@ -2545,6 +2574,37 @@ window.cambiarPeriodoConsumo = function(periodo) {
   renderConsumoCharts();
 };
 
+window.cambiarFiltroCategoriaConsumo = function(cat) {
+  STATE.consumoCategoria = cat;
+  STATE.consumoProducto = "todos";
+  poblarSelectorProductosConsumo();
+  renderConsumoCharts();
+};
+
+window.cambiarFiltroProductoConsumo = function(pId) {
+  STATE.consumoProducto = pId;
+  renderConsumoCharts();
+};
+
+function poblarSelectorProductosConsumo() {
+  const prodSelect = document.getElementById("consumo-filtro-producto");
+  if (!prodSelect) return;
+  
+  const productos = getProductosFlat();
+  let filteredProds = productos;
+  if (STATE.consumoCategoria !== "todas") {
+    filteredProds = productos.filter(p => p.categoria === STATE.consumoCategoria);
+  }
+  
+  filteredProds.sort((a, b) => a.nombre.localeCompare(b.nombre));
+  
+  let html = `<option value="todos">Todas las bebidas</option>`;
+  filteredProds.forEach(p => {
+    html += `<option value="${p.id}" ${STATE.consumoProducto === p.id ? 'selected' : ''}>${p.nombre}</option>`;
+  });
+  prodSelect.innerHTML = html;
+}
+
 function renderConsumoCharts() {
   const container = document.getElementById("consumo-charts-container");
   if (!container || !STATE.consumoRawData) return;
@@ -2559,6 +2619,33 @@ function renderConsumoCharts() {
     return;
   }
 
+  // Filter intervals to apply selected Category / Beverage
+  const productos = getProductosFlat();
+  const filteredIntervals = intervals.map(inv => {
+    let sum = 0;
+    const filteredProdCons = {};
+    
+    Object.entries(inv.consumoPorProducto).forEach(([pId, val]) => {
+      const p = productos.find(prod => prod.id === pId);
+      if (!p) return;
+      
+      // Filtro por categoría
+      if (STATE.consumoCategoria !== "todas" && p.categoria !== STATE.consumoCategoria) return;
+      
+      // Filtro por producto
+      if (STATE.consumoProducto !== "todos" && pId !== STATE.consumoProducto) return;
+      
+      sum += val;
+      filteredProdCons[pId] = val;
+    });
+    
+    return {
+      ...inv,
+      totalConsumo: sum,
+      consumoPorProducto: filteredProdCons
+    };
+  });
+
   // Determine intervals to analyze based on period selection
   let limit = 1;
   if (STATE.consumoPeriodo === "semana") limit = 1;
@@ -2566,11 +2653,10 @@ function renderConsumoCharts() {
   else if (STATE.consumoPeriodo === "trimestre") limit = 12;
   else if (STATE.consumoPeriodo === "semestre") limit = 24;
 
-  const selectedIntervals = intervals.slice(-limit);
+  const selectedIntervals = filteredIntervals.slice(-limit);
 
   // 1. COMPARATIVA SEMANAS (Consumo total por semana)
-  // Let's show the last 6 intervals to give a nice trend chart
-  const trendIntervals = intervals.slice(-6);
+  const trendIntervals = filteredIntervals.slice(-6);
   const maxWeeklyCons = Math.max(...trendIntervals.map(inv => inv.totalConsumo), 1);
 
   let weeklyBarsHTML = "";
@@ -2597,7 +2683,6 @@ function renderConsumoCharts() {
     });
   });
 
-  const productos = getProductosFlat();
   const sortedRanking = Object.entries(productConsumoConsolidated)
     .map(([pId, val]) => {
       const p = productos.find(prod => prod.id === pId);
@@ -2636,10 +2721,35 @@ function renderConsumoCharts() {
     });
   }
 
+  // Subtítulo dinámico para la comparativa de semanas
+  let chartSubtitle = "Consumo total (unidades) en las últimas semanas";
+  if (STATE.consumoProducto !== "todos") {
+    const p = productos.find(prod => prod.id === STATE.consumoProducto);
+    if (p) {
+      let labelUnidad = p.unidad;
+      if (p.unidad === 'pack') labelUnidad = 'packs';
+      else if (p.unidad === 'caja') labelUnidad = 'cajas';
+      else if (p.unidad === 'bot') labelUnidad = 'botellas';
+      else if (p.unidad === 'ud') labelUnidad = 'unidades';
+      chartSubtitle = `Consumo de ${p.nombre} (${labelUnidad}) en las últimas semanas`;
+    }
+  } else if (STATE.consumoCategoria !== "todas") {
+    chartSubtitle = `Consumo de la categoría ${STATE.consumoCategoria} (unidades) en las últimas semanas`;
+  }
+
+  // Subtítulo dinámico para el ranking
+  let rankingSubtitle = `Bebidas más consumidas en el período seleccionado (${STATE.consumoPeriodo === 'semana' ? 'última semana' : STATE.consumoPeriodo === 'mes' ? 'último mes' : STATE.consumoPeriodo === 'trimestre' ? 'últimos 3 meses' : 'últimos 6 meses'})`;
+  if (STATE.consumoCategoria !== "todas" && STATE.consumoProducto === "todos") {
+    rankingSubtitle = `Bebidas de la categoría ${STATE.consumoCategoria} más consumidas en el período seleccionado`;
+  } else if (STATE.consumoProducto !== "todos") {
+    const p = productos.find(prod => prod.id === STATE.consumoProducto);
+    rankingSubtitle = `Detalle de consumo para ${p?.nombre || ''}`;
+  }
+
   container.innerHTML = `
     <div class="card" style="margin-top: 16px;">
       <div class="card-titulo">Comparativa entre semanas</div>
-      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 12px;">Consumo total (unidades) en las últimas semanas</div>
+      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 12px;">${chartSubtitle}</div>
       <div class="bar-chart">
         ${weeklyBarsHTML}
       </div>
@@ -2647,7 +2757,7 @@ function renderConsumoCharts() {
 
     <div class="card">
       <div class="card-titulo">Ranking de Consumo de Bebidas</div>
-      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 16px;">Bebidas más consumidas en el período seleccionado (${STATE.consumoPeriodo === 'semana' ? 'última semana' : STATE.consumoPeriodo === 'mes' ? 'último mes' : STATE.consumoPeriodo === 'trimestre' ? 'últimos 3 meses' : 'últimos 6 meses'})</div>
+      <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 16px;">${rankingSubtitle}</div>
       <div id="ranking-list">
         ${rankingHTML}
       </div>

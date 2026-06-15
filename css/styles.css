@@ -129,6 +129,26 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   padding: 0 4px;
 }
 
+.logout-header-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 8px;
+  color: var(--blanco);
+  font-size: 1.4rem;
+  line-height: 1;
+  min-height: 52px;
+  min-width: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: opacity 0.2s ease;
+}
+
+.logout-header-btn:hover {
+  opacity: 0.8;
+}
+
 /* --- Navegación inferior --- */
 .nav-bottom {
   position: fixed;

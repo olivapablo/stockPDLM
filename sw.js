@@ -2,7 +2,7 @@
 // SERVICE WORKER — Plaza de la Música Stock
 // =============================================
 
-const CACHE_NAME = "plaza-stock-v14";
+const CACHE_NAME = "plaza-stock-v17";
 const ASSETS = [
   "./",
   "./index.html",
@@ -10,12 +10,14 @@ const ASSETS = [
   "./js/productos.js",
   "./js/firebase.js",
   "./js/pdf.js",
+  "./js/excel.js",
   "./js/app.js",
   "./manifest.json",
   "./img/icon.png",
   "./img/logo-plaza.png",
   "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
-  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
+  "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js",
+  "https://cdn.jsdelivr.net/npm/xlsx-js-style@1.2.0/dist/xlsx.bundle.js"
 ];
 
 // Instalar y cachear assets
