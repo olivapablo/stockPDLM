@@ -351,6 +351,33 @@ function formatFechaDisplay(fechaStr) {
 }
 
 // =============================================
+// MIGRACIÓN DE STOCK (ADMIN)
+// =============================================
+async function migrarUltimoConteoAStockActual() {
+  const depositos = ["plaza", "larioja"];
+  let totalMigrados = 0;
+  for (const depId of depositos) {
+    const fechas = await getFechasDisponibles(depId);
+    if (fechas.length > 0) {
+      const ultimaFecha = fechas[0];
+      const snapshotStock = await getStockPorFecha(depId, ultimaFecha);
+      if (snapshotStock) {
+        for (const [prodId, data] of Object.entries(snapshotStock)) {
+          if (data && typeof data.cantidad !== 'undefined') {
+            await db.ref(`stock_actual/${depId}/${prodId}`).set({
+              cantidad: Number(data.cantidad),
+              ultimaActualizacion: data.timestamp || new Date().toISOString()
+            });
+            totalMigrados++;
+          }
+        }
+      }
+    }
+  }
+  return totalMigrados;
+}
+
+// =============================================
 // RESET DE FÁBRICA
 // =============================================
 async function resetAppFabrica() {

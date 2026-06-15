@@ -112,6 +112,7 @@
   <header class="app-header">
     <div class="logo" style="display: flex; align-items: center; gap: 10px;">
       <img src="img/logo-plaza.png" alt="Plaza de la Música" style="height: 36px; width: auto; object-fit: contain;">
+      <span class="logo-text">Plaza de la Música</span>
     </div>
     <div class="header-actions">
       <span class="calc-header-label" onclick="toggleCalcPanel()" id="header-calc-btn">Calculadora</span>
@@ -214,6 +215,14 @@
     <div class="app-version-footer">Oliva González, Pablo — Stock Manager v3.3</div>
   </main>
 
+  <!-- VER STOCK (VISUALIZADOR) -->
+  <main class="vista" id="vista-ver-stock">
+    <h1 class="vista-titulo">Ver Stock</h1>
+    <p class="vista-subtitulo">Stock total acumulado (Plaza + La Rioja)</p>
+    <div id="ver-stock-content"></div>
+    <div class="app-version-footer">Oliva González, Pablo — Stock Manager v4.0</div>
+  </main>
+
   <!-- ==================== NAVEGACIÓN ==================== -->
   <nav class="nav-bottom">
     <button class="nav-item activo" data-vista="dashboard">
@@ -251,6 +260,20 @@
   <!-- ==================== MODAL ==================== -->
   <div class="modal-overlay" id="modal-overlay" onclick="cerrarModalOverlay(event)">
     <div class="modal" id="modal-content"></div>
+  </div>
+
+  <!-- ==================== BOTTOM SHEET (MÁS MENU) ==================== -->
+  <div class="bottom-sheet-overlay" id="bottom-sheet-overlay" onclick="cerrarMenuMasOverlay(event)">
+    <div class="bottom-sheet" id="bottom-sheet-mas">
+      <div class="bottom-sheet-handle"></div>
+      <div class="bottom-sheet-header">
+        <span class="bottom-sheet-title">Opciones Adicionales</span>
+        <button class="bottom-sheet-close" onclick="cerrarMenuMas()">✕</button>
+      </div>
+      <div class="bottom-sheet-content" id="bottom-sheet-options">
+        <!-- Generado dinámicamente -->
+      </div>
+    </div>
   </div>
 
   <!-- ==================== TOAST ==================== -->

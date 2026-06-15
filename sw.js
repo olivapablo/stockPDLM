@@ -2,7 +2,7 @@
 // SERVICE WORKER — Plaza de la Música Stock
 // =============================================
 
-const CACHE_NAME = "plaza-stock-v11";
+const CACHE_NAME = "plaza-stock-v12";
 const ASSETS = [
   "./",
   "./index.html",
@@ -14,7 +14,7 @@ const ASSETS = [
   "./manifest.json",
   "./img/icon.png",
   "./img/logo-plaza.png",
-  "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap",
+  "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap",
   "https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"
 ];
 

@@ -29,7 +29,7 @@ async function initApp() {
     // Fuentes
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap";
     document.head.appendChild(link);
 
     // Navegación
@@ -220,45 +220,106 @@ async function cerrarSesion() {
 }
 
 function ajustarInterfazPorRol() {
-  const navCargar = document.querySelector(`.nav-item[data-vista="cargar"]`);
-  const navHistorial = document.querySelector(`.nav-item[data-vista="historial"]`);
-  const navConfig = document.querySelector(`.nav-item[data-vista="config"]`);
-  const navEntradas = document.querySelector(`.nav-item[data-vista="entradas"]`);
-  const navVencimientos = document.querySelector(`.nav-item[data-vista="vencimientos"]`);
+  const navBottom = document.querySelector(".nav-bottom");
+  if (!navBottom) return;
 
   if (STATE.userRole === "visualizador") {
-    if(navCargar) {
-      navCargar.style.display = "flex";
-      navCargar.innerHTML = `<span class="nav-icon">📊</span>Ver Stock`;
-    }
-    if(navHistorial) navHistorial.style.display = "none";
-    if(navConfig) navConfig.style.display = "none";
-    if(navEntradas) navEntradas.style.display = "none";
-    if(navVencimientos) navVencimientos.style.display = "none";
+    navBottom.innerHTML = `
+      <button class="nav-item ${STATE.vistaActual === 'dashboard' ? 'activo' : ''}" data-vista="dashboard">
+        <span class="nav-icon">🏠</span>
+        Inicio
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'ver-stock' ? 'activo' : ''}" data-vista="ver-stock">
+        <span class="nav-icon">📊</span>
+        Ver Stock
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'alertas' ? 'activo' : ''}" data-vista="alertas">
+        <span class="nav-icon">🔔</span>
+        Alertas
+      </button>
+    `;
   } else {
-    if(navCargar) {
-      navCargar.style.display = "flex";
-      navCargar.innerHTML = `<span class="nav-icon">📦</span>Cargar`;
-    }
-    if (STATE.userRole === "editor") {
-      if(navHistorial) navHistorial.style.display = "flex";
-      if(navConfig) navConfig.style.display = "none";
-      if(navEntradas) navEntradas.style.display = "flex";
-      if(navVencimientos) navVencimientos.style.display = "flex";
-    } else {
-      // Admin
-      if(navHistorial) navHistorial.style.display = "flex";
-      if(navConfig) navConfig.style.display = "flex";
-      if(navEntradas) navEntradas.style.display = "flex";
-      if(navVencimientos) navVencimientos.style.display = "flex";
-    }
+    // Admin o Editor
+    navBottom.innerHTML = `
+      <button class="nav-item ${STATE.vistaActual === 'dashboard' ? 'activo' : ''}" data-vista="dashboard">
+        <span class="nav-icon">🏠</span>
+        Inicio
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'cargar' ? 'activo' : ''}" data-vista="cargar">
+        <span class="nav-icon">📦</span>
+        Cargar
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'alertas' ? 'activo' : ''}" data-vista="alertas">
+        <span class="nav-icon">🔔</span>
+        Alertas
+      </button>
+      <button class="nav-item ${STATE.vistaActual === 'historial' ? 'activo' : ''}" data-vista="historial">
+        <span class="nav-icon">📋</span>
+        Historial
+      </button>
+      <button class="nav-item ${['entradas', 'vencimientos', 'config'].includes(STATE.vistaActual) ? 'activo' : ''}" id="btn-nav-mas" onclick="abrirMenuMas()">
+        <span class="nav-icon">➕</span>
+        Más
+      </button>
+    `;
   }
+
+  // Enlazar eventos de click a botones con data-vista
+  navBottom.querySelectorAll(".nav-item[data-vista]").forEach(btn => {
+    btn.addEventListener("click", () => navegarA(btn.dataset.vista));
+  });
 }
+
+// --- Bottom Sheet / Menú Más ---
+window.abrirMenuMas = function() {
+  const overlay = document.getElementById("bottom-sheet-overlay");
+  const content = document.getElementById("bottom-sheet-options");
+  if (!overlay || !content) return;
+
+  let optionsHTML = `
+    <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('entradas')">
+      <span class="bottom-sheet-row-icon">📥</span>
+      <span class="bottom-sheet-row-text">Entrada de Mercadería</span>
+    </div>
+    <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('vencimientos')">
+      <span class="bottom-sheet-row-icon">📅</span>
+      <span class="bottom-sheet-row-text">Vencimientos</span>
+    </div>
+  `;
+
+  if (STATE.userRole === "admin") {
+    optionsHTML += `
+      <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('config')">
+        <span class="bottom-sheet-row-icon">⚙️</span>
+        <span class="bottom-sheet-row-text">Configuración</span>
+      </div>
+    `;
+  }
+
+  content.innerHTML = optionsHTML;
+  overlay.classList.add("visible");
+};
+
+window.cerrarMenuMas = function() {
+  const overlay = document.getElementById("bottom-sheet-overlay");
+  if (overlay) overlay.classList.remove("visible");
+};
+
+window.cerrarMenuMasOverlay = function(e) {
+  if (e.target === document.getElementById("bottom-sheet-overlay")) {
+    cerrarMenuMas();
+  }
+};
+
+window.seleccionarOpcionMas = function(vista) {
+  cerrarMenuMas();
+  navegarA(vista);
+};
 
 // --- Navegación ---
 function navegarA(vista) {
   // Bloquear acceso a visualizadores
-  if (STATE.userRole === "visualizador" && ["historial", "config", "entradas", "vencimientos"].includes(vista)) {
+  if (STATE.userRole === "visualizador" && !["dashboard", "ver-stock", "alertas"].includes(vista)) {
     return mostrarToast("No tienes permisos para ver esta sección", "error");
   }
   // Bloquear acceso a editores a config
@@ -272,7 +333,13 @@ function navegarA(vista) {
   document.querySelectorAll(".nav-item").forEach(b => b.classList.remove("activo"));
 
   document.getElementById(`vista-${vista}`)?.classList.add("activa");
-  document.querySelector(`.nav-item[data-vista="${vista}"]`)?.classList.add("activo");
+
+  // Resaltar la pestaña activa
+  if (["dashboard", "cargar", "ver-stock", "alertas", "historial"].includes(vista)) {
+    document.querySelector(`.nav-item[data-vista="${vista}"]`)?.classList.add("activo");
+  } else {
+    document.getElementById("btn-nav-mas")?.classList.add("activo");
+  }
 
   // Limpiar el contador de alertas al visitar la pestaña
   if (vista === "alertas") {
@@ -285,6 +352,7 @@ function navegarA(vista) {
   switch (vista) {
     case "dashboard": renderDashboard(); break;
     case "cargar": renderCargar(); break;
+    case "ver-stock": renderVerStock(); break;
     case "alertas": renderAlertas(); break;
     case "historial": renderHistorial(); break;
     case "config": renderConfig(); break;
@@ -403,10 +471,7 @@ async function renderDashboard() {
           </div>
         </div>
       </div>
-      ${STATE.userRole === "visualizador" ? `
-      <button class="btn btn-dorado btn-full" style="margin-bottom:10px;font-size:1rem;padding:18px" onclick="navegarA('cargar')">
-        📊 Ver Stock Actual
-      </button>` : `
+      ${STATE.userRole === "visualizador" ? "" : `
       <button class="btn btn-dorado btn-full" style="margin-bottom:10px;font-size:1rem;padding:18px" onclick="navegarA('cargar')">
         📦 Cargar Stock
       </button>
@@ -884,7 +949,7 @@ async function renderAlertas() {
           <div style="display:flex;flex-direction:column;align-items:end;gap:4px">
             <span style="font-size:0.9rem;font-weight:700;color:var(--rojo-alerta);white-space:nowrap">${descDias}</span>
             ${showRetirarBtn ? `
-            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:2px 6px;font-size:0.7rem;height:auto;min-height:24px;margin-top:2px" onclick="confirmarRetirarLoteDesdeAlertas('${item.depositoId}', '${item.id}')">
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:6px 12px;font-size:16px;height:auto;min-height:52px;margin-top:2px" onclick="confirmarRetirarLoteDesdeAlertas('${item.depositoId}', '${item.id}')">
               Retirar
             </button>` : ''}
           </div>
@@ -1134,6 +1199,13 @@ async function renderConfig() {
           <div class="config-desc" id="sync-status">Verificando...</div>
         </div>
         <button class="btn btn-secundario btn-sm" onclick="forzarSync()">Sincronizar</button>
+      </div>
+      <div class="config-row" style="border-top:1px solid var(--gris-borde)">
+        <div>
+          <div class="config-label">Migrar último conteo a stock actual</div>
+          <div class="config-desc">Inicializa el stock en vivo con el conteo semanal más reciente</div>
+        </div>
+        <button class="btn btn-secundario btn-sm" onclick="ejecutarMigracionStock()">Migrar</button>
       </div>
       <div class="config-row" style="border-top:1px solid var(--gris-borde);border-bottom:none">
         <div>
@@ -1509,7 +1581,7 @@ async function renderVencimientos() {
           </div>
           <div style="display:flex;flex-direction:column;align-items:end;gap:8px">
             ${badgeDias}
-            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:4px 8px;font-size:0.75rem;height:auto;min-height:30px" onclick="confirmarRetirarLote('${item.depositoId}', '${item.id}')">
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:6px 12px;font-size:16px;height:auto;min-height:52px" onclick="confirmarRetirarLote('${item.depositoId}', '${item.id}')">
               Retirar
             </button>
           </div>
@@ -2145,3 +2217,157 @@ async function ejecutarResetFabrica() {
     cerrarModal();
   }
 }
+
+// =============================================
+// ACCIONES DE MIGRACIÓN (ADMIN)
+// =============================================
+window.ejecutarMigracionStock = async function() {
+  if (!confirm("¿Deseas sobreescribir el stock actual de todos los productos en todos los depósitos con los valores del último conteo? Esto inicializará stock_actual con el conteo más reciente.")) return;
+
+  const btn = document.querySelector(".config-row button[onclick='ejecutarMigracionStock()']");
+  if (!btn) return;
+  const oldText = btn.innerHTML;
+  btn.disabled = true;
+  btn.innerHTML = `<span class="spinner"></span> Migrando...`;
+
+  try {
+    const totalMigrados = await migrarUltimoConteoAStockActual();
+    mostrarToast(`✅ Migración exitosa: ${totalMigrados} productos actualizados`, "ok");
+    renderDashboard();
+  } catch (e) {
+    console.error(e);
+    mostrarToast("Error durante la migración: " + e.message, "error");
+  } finally {
+    btn.disabled = false;
+    btn.innerHTML = oldText;
+  }
+};
+
+// =============================================
+// VISTA: VER STOCK (VISUALIZADOR CONSOLIDADO)
+// =============================================
+async function renderVerStock() {
+  const el = document.getElementById("ver-stock-content");
+  if (!el) return;
+
+  el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando stock consolidado...</div></div>`;
+
+  try {
+    const [stockPlaza, stockLarioja] = await Promise.all([
+      getStockActual("plaza"),
+      getStockActual("larioja")
+    ]);
+
+    const productos = getProductosFlat();
+    const categorias = getCategorias();
+
+    let html = `
+      <div class="input-group" style="margin-bottom:16px;">
+        <input type="text" class="input-field" id="ver-stock-buscador" placeholder="Buscar bebida o categoría..." oninput="filtrarProductosVerStock(this.value)">
+      </div>
+      <div id="lista-productos-ver-stock">
+    `;
+
+    categorias.forEach(cat => {
+      const prodsCat = productos.filter(p => p.categoria === cat);
+      if (prodsCat.length === 0) return;
+
+      const marcas = [...new Set(prodsCat.map(p => p.marca))];
+
+      html += `<div class="categoria-section" data-cat="${cat.toLowerCase()}">`;
+      html += `<div class="categoria-header"><span>📁</span>${cat}</div>`;
+
+      marcas.forEach(marca => {
+        const prodsMarca = prodsCat.filter(p => p.marca === marca);
+        const mostrarMarca = prodsMarca.length > 1 || prodsMarca[0].variante !== "Común";
+
+        html += `<div class="subcategoria-grupo">`;
+
+        if (mostrarMarca && marcas.length > 1) {
+          html += `<div class="marca-header">${marca}</div>`;
+        }
+
+        prodsMarca.forEach(p => {
+          const cantPlaza = stockPlaza[p.id]?.cantidad ?? 0;
+          const cantLarioja = stockLarioja[p.id]?.cantidad ?? 0;
+          const totalUnidades = cantPlaza + cantLarioja;
+
+          const idSueltas = `${p.id}__sueltas`;
+          const sueltasPlaza = stockPlaza[idSueltas]?.cantidad ?? 0;
+          const sueltasLarioja = stockLarioja[idSueltas]?.cantidad ?? 0;
+          const totalSueltas = sueltasPlaza + sueltasLarioja;
+
+          const tieneSueltas = p.unidad === "pack" || p.unidad === "caja";
+          const packSize = tieneSueltas ? getPackSize(p.marca, p.variante) : null;
+          const nombreMostrado = prodsMarca.length === 1 ? p.nombre :
+            (p.variante === "Común" ? marca : p.variante);
+          const searchKeywords = `${cat} ${marca} ${p.nombre} ${p.variante}`.toLowerCase();
+
+          html += `
+            <div class="producto-row-visualizador" data-search="${searchKeywords}">
+              <div class="producto-info">
+                <div class="producto-nombre">${nombreMostrado}</div>
+                <div class="producto-unidad">${p.unidad}${packSize ? ` ×${packSize}` : ''}</div>
+              </div>
+              <div class="producto-cantidad-visual">
+                ${tieneSueltas ? `
+                  <div class="cantidad-principal-val">
+                    ${totalUnidades} <span class="cantidad-principal-sub">${p.unidad === 'caja' ? 'cajas' : 'packs'}</span>
+                  </div>
+                  ${totalSueltas > 0 ? `
+                    <div class="cantidad-sueltas-val">
+                      + ${totalSueltas} sueltas
+                    </div>
+                  ` : ''}
+                ` : `
+                  <div class="cantidad-principal-val">
+                    ${totalUnidades}
+                  </div>
+                `}
+              </div>
+            </div>
+          `;
+        });
+
+        html += `</div>`;
+      });
+      html += `</div>`;
+    });
+
+    html += `</div>`;
+    el.innerHTML = html;
+
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">❌</div><div class="vacio-texto">Error al cargar el stock consolidado.</div></div>`;
+  }
+}
+
+window.filtrarProductosVerStock = function(texto) {
+  const query = texto.toLowerCase().trim();
+  const secciones = document.querySelectorAll("#lista-productos-ver-stock .categoria-section");
+  
+  secciones.forEach(sec => {
+    let tieneVisibles = false;
+    const catName = sec.getAttribute("data-cat");
+    const filas = sec.querySelectorAll(".producto-row-visualizador");
+    
+    filas.forEach(fila => {
+      const searchStr = fila.getAttribute("data-search");
+      if (query === "" || searchStr.includes(query) || catName.includes(query)) {
+        fila.style.display = "flex";
+        tieneVisibles = true;
+      } else {
+        fila.style.display = "none";
+      }
+    });
+
+    const grupos = sec.querySelectorAll(".subcategoria-grupo");
+    grupos.forEach(grupo => {
+      const algunVisible = Array.from(grupo.querySelectorAll(".producto-row-visualizador")).some(f => f.style.display !== "none");
+      grupo.style.display = algunVisible ? "" : "none";
+    });
+
+    sec.style.display = tieneVisibles ? "" : "none";
+  });
+};
