@@ -7,7 +7,9 @@
 const STATE = {
   vistaActual: "dashboard",
   depositoSeleccionado: null,
-  responsable: localStorage.getItem("plaza_responsable") || "",
+  responsable: "",
+  userRole: null,
+  currentUser: null,
   stockCargando: {},
   stockPorDeposito: {},
   stockPrevioCache: {},
@@ -23,42 +25,212 @@ document.addEventListener("DOMContentLoaded", async () => {
 });
 
 async function initApp() {
-  // Fuentes
-  const link = document.createElement("link");
-  link.rel = "stylesheet";
-  link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap";
-  document.head.appendChild(link);
+  try {
+    // Fuentes
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap";
+    document.head.appendChild(link);
 
-  // Navegación
-  document.querySelectorAll(".nav-item").forEach(btn => {
-    btn.addEventListener("click", () => navegarA(btn.dataset.vista));
-  });
+    // Navegación
+    document.querySelectorAll(".nav-item").forEach(btn => {
+      btn.addEventListener("click", () => navegarA(btn.dataset.vista));
+    });
 
-  // Indicador offline
-  window.addEventListener("online", () => {
-    document.getElementById("offline-bar").classList.remove("visible");
-    mostrarToast("Conexión restaurada. Sincronizando...", "ok");
-  });
-  window.addEventListener("offline", () => {
-    document.getElementById("offline-bar").classList.add("visible");
-    mostrarToast("Sin conexión. Los datos se guardarán localmente.", "offline");
-  });
-  if (!navigator.onLine) {
-    document.getElementById("offline-bar").classList.add("visible");
+    // Indicador offline
+    window.addEventListener("online", () => {
+      document.getElementById("offline-bar").classList.remove("visible");
+      mostrarToast("Conexión restaurada. Sincronizando...", "ok");
+    });
+    window.addEventListener("offline", () => {
+      document.getElementById("offline-bar").classList.add("visible");
+      mostrarToast("Sin conexión. Los datos se guardarán localmente.", "offline");
+    });
+    if (!navigator.onLine) {
+      document.getElementById("offline-bar").classList.add("visible");
+    }
+
+    if (typeof auth === 'undefined') {
+      alert("Error: Firebase Auth no está definido. Revisa tu conexión a internet o los scripts en index.html.");
+      return;
+    }
+
+    // Auth Listener
+    auth.onAuthStateChanged(async (user) => {
+      try {
+        const authContainer = document.getElementById("auth-container");
+        const appContainer = document.getElementById("app-container");
+
+        if (user) {
+          STATE.currentUser = user;
+          
+          // Verificar si está en /usuarios
+          const snapshot = await db.ref(`usuarios/${user.uid}`).once("value");
+          if (snapshot.exists()) {
+            const userData = snapshot.val();
+            STATE.userRole = userData.role;
+            STATE.responsable = userData.nombre || user.displayName || user.email;
+            
+            authContainer.style.display = "none";
+            appContainer.style.display = "block";
+            
+            ajustarInterfazPorRol();
+            await renderDashboard();
+            navegarA("dashboard");
+          } else {
+            // Verificar si está en pendientes
+            const pendingSnap = await db.ref(`usuarios_pendientes/${user.uid}`).once("value");
+            if (pendingSnap.exists()) {
+              mostrarAuthVista("auth-pending");
+              authContainer.style.display = "flex";
+              appContainer.style.display = "none";
+            } else {
+              // Si no está en ninguna, fue un registro con Google directo, lo agregamos a pendientes
+              await db.ref(`usuarios_pendientes/${user.uid}`).set({
+                nombre: user.displayName || "",
+                email: user.email,
+                fechaSolicitud: new Date().toISOString(),
+                metodo: "google"
+              });
+              mostrarAuthVista("auth-pending");
+              authContainer.style.display = "flex";
+              appContainer.style.display = "none";
+            }
+          }
+        } else {
+          STATE.currentUser = null;
+          STATE.userRole = null;
+          STATE.responsable = "";
+          authContainer.style.display = "flex";
+          appContainer.style.display = "none";
+          mostrarAuthVista("auth-login");
+        }
+      } catch (err) {
+        alert("Error en Auth Listener: " + err.message);
+        console.error(err);
+      }
+    });
+  } catch (err) {
+    alert("Error crítico al iniciar la app: " + err.message);
+    console.error(err);
   }
+}
 
-  // Responsable
-  if (!STATE.responsable) {
-    mostrarModalResponsable();
+// --- Auth Functions ---
+function mostrarAuthVista(vistaId) {
+  document.querySelectorAll(".auth-vista").forEach(v => v.style.display = "none");
+  document.getElementById(vistaId).style.display = "block";
+}
+
+async function iniciarSesionEmail() {
+  const email = document.getElementById("login-email").value;
+  const pass = document.getElementById("login-password").value;
+  if (!email || !pass) return mostrarToast("Ingresá email y contraseña", "error");
+  
+  const btn = document.getElementById("btn-login");
+  const oldText = btn.innerHTML;
+  btn.innerHTML = "Cargando...";
+  btn.disabled = true;
+
+  try {
+    await auth.signInWithEmailAndPassword(email, pass);
+  } catch (error) {
+    mostrarToast("Error: " + error.message, "error");
+    btn.innerHTML = oldText;
+    btn.disabled = false;
   }
+}
 
-  // Render inicial
-  await renderDashboard();
-  navegarA("dashboard");
+async function iniciarSesionGoogle() {
+  try {
+    await auth.signInWithPopup(googleProvider);
+  } catch (error) {
+    alert("Error de Google: " + error.message);
+    mostrarToast("Error al iniciar con Google: " + error.message, "error");
+  }
+}
+
+async function registrarEmail() {
+  const name = document.getElementById("register-name").value;
+  const email = document.getElementById("register-email").value;
+  const pass = document.getElementById("register-password").value;
+  const passConfirm = document.getElementById("register-password-confirm").value;
+
+  if (!name || !email || !pass) return mostrarToast("Completá todos los campos", "error");
+  if (pass !== passConfirm) return mostrarToast("Las contraseñas no coinciden", "error");
+
+  const btn = document.getElementById("btn-register");
+  const oldText = btn.innerHTML;
+  btn.innerHTML = "Cargando...";
+  btn.disabled = true;
+
+  try {
+    const cred = await auth.createUserWithEmailAndPassword(email, pass);
+    await cred.user.updateProfile({ displayName: name });
+    
+    // Agregar a pendientes
+    await db.ref(`usuarios_pendientes/${cred.user.uid}`).set({
+      nombre: name,
+      email: email,
+      fechaSolicitud: new Date().toISOString(),
+      metodo: "email"
+    });
+  } catch (error) {
+    alert("Error de registro: " + error.message);
+    mostrarToast("Error: " + error.message, "error");
+    btn.innerHTML = oldText;
+    btn.disabled = false;
+  }
+}
+
+async function recuperarPassword() {
+  const email = document.getElementById("forgot-email").value;
+  if (!email) return mostrarToast("Ingresá tu email", "error");
+  try {
+    await auth.sendPasswordResetEmail(email);
+    mostrarToast("Enlace enviado a tu email", "ok");
+    mostrarAuthVista("auth-login");
+  } catch (error) {
+    mostrarToast("Error: " + error.message, "error");
+  }
+}
+
+async function cerrarSesion() {
+  await auth.signOut();
+}
+
+function ajustarInterfazPorRol() {
+  const navCargar = document.querySelector(`.nav-item[data-vista="cargar"]`);
+  const navHistorial = document.querySelector(`.nav-item[data-vista="historial"]`);
+  const navConfig = document.querySelector(`.nav-item[data-vista="config"]`);
+
+  if (STATE.userRole === "visualizador") {
+    if(navCargar) navCargar.style.display = "none";
+    if(navHistorial) navHistorial.style.display = "none";
+    if(navConfig) navConfig.style.display = "none";
+  } else if (STATE.userRole === "editor") {
+    if(navCargar) navCargar.style.display = "flex";
+    if(navHistorial) navHistorial.style.display = "flex";
+    if(navConfig) navConfig.style.display = "none";
+  } else {
+    // Admin
+    if(navCargar) navCargar.style.display = "flex";
+    if(navHistorial) navHistorial.style.display = "flex";
+    if(navConfig) navConfig.style.display = "flex";
+  }
 }
 
 // --- Navegación ---
 function navegarA(vista) {
+  // Bloquear acceso a visualizadores
+  if (STATE.userRole === "visualizador" && ["cargar", "historial", "config"].includes(vista)) {
+    return mostrarToast("No tienes permisos para ver esta sección", "error");
+  }
+  // Bloquear acceso a editores a config
+  if (STATE.userRole === "editor" && vista === "config") {
+    return mostrarToast("No tienes permisos para ver esta sección", "error");
+  }
+
   STATE.vistaActual = vista;
 
   document.querySelectorAll(".vista").forEach(v => v.classList.remove("activa"));
@@ -184,14 +356,6 @@ function renderCargar() {
   STATE.stockPrevioCache = {};   // Limpiar caché al entrar a vista de carga
 
   el.innerHTML = `
-    <div class="input-group">
-      <label class="input-label">¿Quién está cargando?</label>
-      <input type="text" class="input-field" id="input-responsable"
-        placeholder="Tu nombre"
-        value="${STATE.responsable}"
-        oninput="STATE.responsable = this.value; localStorage.setItem('plaza_responsable', this.value)">
-    </div>
-
     <div class="card-titulo" style="margin-bottom:10px">Seleccioná el depósito</div>
     <div class="deposito-selector" id="deposito-selector">
       <button class="deposito-btn" onclick="seleccionarDeposito('plaza')" id="dep-plaza">
@@ -746,14 +910,17 @@ async function renderConfig() {
 
       <div class="config-row">
         <div>
-          <div class="config-label">Tu nombre</div>
-          <div class="config-desc">Se registra en cada carga de stock</div>
+          <div class="config-label">Cuenta activa</div>
+          <div class="config-desc">${STATE.currentUser ? STATE.currentUser.email : ''} (${STATE.userRole})</div>
         </div>
-        <input type="text" class="config-input-sm" style="width:120px;text-align:left"
-          id="config-responsable"
-          value="${STATE.responsable}"
-          placeholder="Nombre"
-          oninput="STATE.responsable = this.value; localStorage.setItem('plaza_responsable', this.value)">
+        <button class="btn btn-secundario btn-sm" onclick="cerrarSesion()">Cerrar sesión</button>
+      </div>
+
+      <div class="config-row">
+        <div>
+          <div class="config-label">Tu nombre</div>
+          <div class="config-desc">${STATE.responsable || "No definido"}</div>
+        </div>
       </div>
 
       <div class="config-row">
@@ -802,8 +969,82 @@ async function renderConfig() {
   document.getElementById("sync-status").textContent =
     queue.length > 0 ? `${queue.length} registro${queue.length > 1 ? "s" : ""} pendiente${queue.length > 1 ? "s" : ""} de sincronizar` : "Todo sincronizado";
 
-  // Mostrar productos agregados manualmente
   renderProductosExtra();
+
+  // Si es admin, cargar sección de usuarios pendientes
+  if (STATE.userRole === "admin") {
+    const adminSection = document.createElement("div");
+    adminSection.className = "card";
+    adminSection.innerHTML = `
+      <div class="card-titulo">Usuarios Pendientes</div>
+      <div class="config-desc" style="margin-bottom:12px">Aprobar o rechazar nuevos registros</div>
+      <div id="lista-usuarios-pendientes"><div class="estado-vacio"><div class="vacio-texto">Cargando...</div></div></div>
+    `;
+    el.appendChild(adminSection);
+    cargarUsuariosPendientes();
+  }
+}
+
+async function cargarUsuariosPendientes() {
+  const el = document.getElementById("lista-usuarios-pendientes");
+  if (!el) return;
+  const snap = await db.ref("usuarios_pendientes").once("value");
+  if (!snap.exists()) {
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">No hay usuarios pendientes.</div></div>`;
+    return;
+  }
+
+  const pendientes = snap.val();
+  let html = "";
+  Object.keys(pendientes).forEach(uid => {
+    const p = pendientes[uid];
+    html += `
+      <div style="border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); padding: 12px; margin-bottom: 10px;">
+        <div style="font-weight: 600;">${p.nombre || "Sin nombre"}</div>
+        <div style="font-size: 0.8rem; color: var(--gris-medio); margin-bottom: 8px;">${p.email}</div>
+        <div style="display: flex; gap: 8px; margin-bottom: 8px;">
+          <select id="rol-${uid}" class="input-field" style="padding: 8px; font-size: 0.9rem;">
+            <option value="editor">Editor</option>
+            <option value="visualizador">Visualizador</option>
+          </select>
+        </div>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-primario btn-sm" style="flex:1" onclick="aprobarUsuario('${uid}', '${p.nombre || ""}', '${p.email}')">Aprobar</button>
+          <button class="btn btn-secundario btn-sm" style="flex:1; border-color: var(--rojo-alerta); color: var(--rojo-alerta);" onclick="rechazarUsuario('${uid}')">Rechazar</button>
+        </div>
+      </div>
+    `;
+  });
+  el.innerHTML = html;
+}
+
+async function aprobarUsuario(uid, nombre, email) {
+  const rol = document.getElementById(`rol-${uid}`).value;
+  if (!confirm(`¿Aprobar como ${rol}?`)) return;
+
+  try {
+    await db.ref(`usuarios/${uid}`).set({
+      nombre,
+      email,
+      role: rol
+    });
+    await db.ref(`usuarios_pendientes/${uid}`).remove();
+    mostrarToast("Usuario aprobado", "ok");
+    cargarUsuariosPendientes();
+  } catch (e) {
+    mostrarToast("Error al aprobar: " + e.message, "error");
+  }
+}
+
+async function rechazarUsuario(uid) {
+  if (!confirm("¿Rechazar y eliminar esta solicitud?")) return;
+  try {
+    await db.ref(`usuarios_pendientes/${uid}`).remove();
+    mostrarToast("Usuario rechazado", "ok");
+    cargarUsuariosPendientes();
+  } catch (e) {
+    mostrarToast("Error al rechazar: " + e.message, "error");
+  }
 }
 
 function actualizarUmbral(valor) {

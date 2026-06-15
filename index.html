@@ -16,6 +16,7 @@
 
   <!-- Firebase -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
   <!-- jsPDF -->
@@ -27,6 +28,85 @@
   <div class="offline-bar" id="offline-bar">
     📵 Sin conexión — Los cambios se guardarán y sincronizarán al volver
   </div>
+
+  <!-- ==================== AUTH ==================== -->
+  <div id="auth-container" class="auth-container" style="display: none;">
+    <!-- Vista de Login -->
+    <div id="auth-login" class="auth-vista">
+      <div class="auth-logo"><img src="img/logo-plaza.png" alt="Plaza de la Música"></div>
+      <h1 class="vista-titulo" style="text-align: center;">Iniciar Sesión</h1>
+      <div class="input-group" style="margin-top: 20px;">
+        <input type="email" class="input-field" id="login-email" placeholder="Email">
+      </div>
+      <div class="input-group">
+        <input type="password" class="input-field" id="login-password" placeholder="Contraseña">
+      </div>
+      <button class="btn btn-primario btn-full" onclick="iniciarSesionEmail()" id="btn-login" style="margin-top: 10px;">Ingresar</button>
+      <div style="text-align: center; margin-top: 15px; margin-bottom: 15px; color: var(--gris-borde);">o</div>
+      <button class="btn btn-secundario btn-full" onclick="iniciarSesionGoogle()" style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Iniciar sesión con Google
+      </button>
+      <div style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+        <a href="#" onclick="mostrarAuthVista('auth-forgot')" style="color: var(--dorado); text-decoration: none;">¿Olvidaste tu contraseña?</a>
+      </div>
+      <div style="text-align: center; margin-top: 15px; font-size: 0.9rem;">
+        ¿No tenés cuenta? <a href="#" onclick="mostrarAuthVista('auth-register')" style="color: var(--dorado); font-weight: 600; text-decoration: none;">Registrate</a>
+      </div>
+    </div>
+
+    <!-- Vista de Registro -->
+    <div id="auth-register" class="auth-vista" style="display: none;">
+      <div class="auth-logo"><img src="img/logo-plaza.png" alt="Plaza de la Música"></div>
+      <h1 class="vista-titulo" style="text-align: center;">Crear Cuenta</h1>
+      <div class="input-group" style="margin-top: 20px;">
+        <input type="text" class="input-field" id="register-name" placeholder="Nombre completo">
+      </div>
+      <div class="input-group">
+        <input type="email" class="input-field" id="register-email" placeholder="Email">
+      </div>
+      <div class="input-group">
+        <input type="password" class="input-field" id="register-password" placeholder="Contraseña">
+      </div>
+      <div class="input-group">
+        <input type="password" class="input-field" id="register-password-confirm" placeholder="Confirmar Contraseña">
+      </div>
+      <button class="btn btn-primario btn-full" onclick="registrarEmail()" id="btn-register" style="margin-top: 10px;">Registrarme</button>
+      <div style="text-align: center; margin-top: 15px; margin-bottom: 15px; color: var(--gris-borde);">o</div>
+      <button class="btn btn-secundario btn-full" onclick="iniciarSesionGoogle()" style="display: flex; justify-content: center; align-items: center; gap: 10px;">
+        <svg width="18" height="18" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+        Registrarme con Google
+      </button>
+      <div style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+        ¿Ya tenés cuenta? <a href="#" onclick="mostrarAuthVista('auth-login')" style="color: var(--dorado); font-weight: 600; text-decoration: none;">Ingresá</a>
+      </div>
+    </div>
+
+    <!-- Vista de Olvidé Contraseña -->
+    <div id="auth-forgot" class="auth-vista" style="display: none;">
+      <div class="auth-logo"><img src="img/logo-plaza.png" alt="Plaza de la Música"></div>
+      <h1 class="vista-titulo" style="text-align: center;">Recuperar Contraseña</h1>
+      <p class="vista-subtitulo" style="text-align: center; margin-bottom: 20px;">Ingresá tu email y te enviaremos un enlace.</p>
+      <div class="input-group">
+        <input type="email" class="input-field" id="forgot-email" placeholder="Email">
+      </div>
+      <button class="btn btn-primario btn-full" onclick="recuperarPassword()" id="btn-forgot">Enviar enlace</button>
+      <div style="text-align: center; margin-top: 20px; font-size: 0.9rem;">
+        <a href="#" onclick="mostrarAuthVista('auth-login')" style="color: var(--dorado); text-decoration: none;">Volver al inicio de sesión</a>
+      </div>
+    </div>
+
+    <!-- Vista de Cuenta Pendiente -->
+    <div id="auth-pending" class="auth-vista" style="display: none;">
+      <div class="auth-logo"><img src="img/logo-plaza.png" alt="Plaza de la Música"></div>
+      <h1 class="vista-titulo" style="text-align: center;">Cuenta en Revisión</h1>
+      <div style="text-align: center; font-size: 3rem; margin: 20px 0;">⏳</div>
+      <p class="vista-subtitulo" style="text-align: center; margin-bottom: 20px; font-size: 1rem;">Tu cuenta está pendiente de aprobación.<br><br>Te avisaremos cuando un administrador la active para que puedas usar la aplicación.</p>
+      <button class="btn btn-secundario btn-full" onclick="cerrarSesion()">Cerrar Sesión</button>
+    </div>
+  </div>
+
+  <div id="app-container" style="display: none;">
 
   <!-- Header -->
   <header class="app-header">
@@ -141,6 +221,8 @@
       Config
     </button>
   </nav>
+
+  </div> <!-- End app-container -->
 
   <!-- ==================== MODAL ==================== -->
   <div class="modal-overlay" id="modal-overlay" onclick="cerrarModalOverlay(event)">

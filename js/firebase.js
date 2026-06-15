@@ -16,6 +16,8 @@ const FIREBASE_CONFIG = {
 // Inicializar Firebase
 firebase.initializeApp(FIREBASE_CONFIG);
 const db = firebase.database();
+const auth = firebase.auth();
+const googleProvider = new firebase.auth.GoogleAuthProvider();
 
 // =============================================
 // DEPÓSITOS

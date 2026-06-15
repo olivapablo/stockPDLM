@@ -1343,3 +1343,41 @@ input[type="number"] {
 .calc-btn-eq:active {
   background: #155b31;
 }
+
+/* =============================================
+   AUTH STYLES
+   ============================================= */
+.auth-container {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background: var(--gris-fondo);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+}
+
+.auth-vista {
+  width: 100%;
+  max-width: 400px;
+  background: var(--blanco);
+  border-radius: var(--radio);
+  padding: 30px;
+  box-shadow: var(--sombra-elevada);
+}
+
+.auth-logo {
+  text-align: center;
+  margin-bottom: 20px;
+}
+
+.auth-logo img {
+  height: 48px;
+  width: auto;
+  object-fit: contain;
+}
