@@ -1224,8 +1224,9 @@ async function renderConfig() {
 
   renderProductosExtra();
 
-  // Si es admin, cargar sección de usuarios pendientes
+  // Si es admin, cargar secciones de administración
   if (STATE.userRole === "admin") {
+    // 1. Usuarios pendientes
     const adminSection = document.createElement("div");
     adminSection.className = "card";
     adminSection.innerHTML = `
@@ -1235,6 +1236,17 @@ async function renderConfig() {
     `;
     el.appendChild(adminSection);
     cargarUsuariosPendientes();
+
+    // 2. Gestionar Participantes (Usuarios registrados)
+    const activeUsersSection = document.createElement("div");
+    activeUsersSection.className = "card";
+    activeUsersSection.innerHTML = `
+      <div class="card-titulo">Gestionar Participantes</div>
+      <div class="config-desc" style="margin-bottom:12px">Listado de usuarios activos y opción de eliminarlos</div>
+      <div id="lista-usuarios-activos"><div class="estado-vacio"><div class="vacio-texto">Cargando...</div></div></div>
+    `;
+    el.appendChild(activeUsersSection);
+    cargarUsuariosActivos();
   }
 }
 
@@ -1858,6 +1870,61 @@ async function rechazarUsuario(uid) {
     mostrarToast("Error al rechazar: " + e.message, "error");
   }
 }
+
+async function cargarUsuariosActivos() {
+  const el = document.getElementById("lista-usuarios-activos");
+  if (!el) return;
+
+  try {
+    const snap = await db.ref("usuarios").once("value");
+    if (!snap.exists()) {
+      el.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">No hay participantes registrados.</div></div>`;
+      return;
+    }
+
+    const usuarios = snap.val();
+    let html = "";
+    Object.keys(usuarios).forEach(uid => {
+      const u = usuarios[uid];
+      const esPropioUser = STATE.currentUser && STATE.currentUser.uid === uid;
+      const nombreLimpio = (u.nombre || "Sin nombre").replace(/'/g, "\\'");
+      
+      html += `
+        <div style="border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); padding: 12px; margin-bottom: 10px; display: flex; justify-content: space-between; align-items: center; gap: 10px;">
+          <div>
+            <div style="font-weight: 600;">${u.nombre || "Sin nombre"} ${esPropioUser ? '<span style="font-size:0.75rem;color:var(--dorado);font-weight:bold">(Tú)</span>' : ''}</div>
+            <div style="font-size: 0.8rem; color: var(--gris-medio); margin-top: 2px;">${u.email}</div>
+            <div style="font-size: 0.75rem; color: var(--dorado); font-weight: bold; text-transform: uppercase; margin-top: 4px;">Rol: ${u.role || "editor"}</div>
+          </div>
+          <div>
+            ${esPropioUser ? '' : `
+              <button class="btn btn-secundario btn-sm" style="border-color: var(--rojo-alerta); color: var(--rojo-alerta); font-size: 0.85rem; padding: 4px 10px; height: auto; min-height: 36px;" onclick="eliminarUsuario('${uid}', '${nombreLimpio}')">
+                Borrar
+              </button>
+            `}
+          </div>
+        </div>
+      `;
+    });
+    el.innerHTML = html;
+  } catch (e) {
+    console.error(e);
+    el.innerHTML = `<div class="estado-vacio"><div class="vacio-texto">Error al cargar participantes.</div></div>`;
+  }
+}
+
+window.eliminarUsuario = async function(uid, nombre) {
+  if (!confirm(`¿Estás seguro de que deseas eliminar permanentemente al participante "${nombre}"? Esta acción no se puede deshacer.`)) return;
+
+  try {
+    await db.ref(`usuarios/${uid}`).remove();
+    mostrarToast("Participante eliminado exitosamente", "ok");
+    cargarUsuariosActivos();
+    cargarUsuariosPendientes();
+  } catch (e) {
+    mostrarToast("Error al eliminar: " + e.message, "error");
+  }
+};
 
 function actualizarUmbral(valor) {
   const n = parseInt(valor);
