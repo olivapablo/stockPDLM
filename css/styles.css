@@ -5,23 +5,24 @@
 
 /* --- Variables --- */
 :root {
-  --negro: #1A1A1A;             /* Texto principal */
+  --negro: #1A1A1A;             /* Negro suave */
   --negro-suave: #1A1A1A;
   --gris-oscuro: #1A1A1A;
-  --gris-medio: #7A6F65;        /* Texto secundario */
-  --gris-borde: #E8E0D5;        /* Bordes sutiles */
-  --gris-fondo: #F9F6F1;        /* Fondo principal (Papel de lujo) */
-  --blanco: #FFFFFF;            /* Fondo de cards */
-  --dorado: #B8860B;            /* Acento dorado primario */
-  --dorado-suave: #F5E6C4;      /* Acento dorado claro (hover/fondos) */
-  --rojo-alerta: #C0392B;       /* Rojo alerta */
-  --rojo-alerta-bg: #FDF0EE;    /* Fondo rojo alerta */
+  --gris-medio: #64748B;        /* Gris neutro */
+  --gris-borde: #E2E8F0;        /* Borde gris neutro */
+  --gris-fondo: #F8F9FA;        /* Blanco neutro */
+  --blanco: #FFFFFF;
+  --dorado: #00A8D5;            /* Azul principal (Primary) */
+  --dorado-suave: #E0F4FB;      /* Azul claro (Primary 50/100) */
+  --rojo-alerta: #D50E00;       /* Rojo complementario (Complementary) */
+  --rojo-alerta-bg: #FDEAE8;    /* Rojo claro bg */
   --verde: #1E7D45;             /* Verde confirmación */
-  --verde-bg: #EAF5EE;          /* Fondo verde confirmación */
-  --borde-input: #D5C9BC;       /* Inputs borde */
+  --verde-bg: #EAF5EE;
+  --triadico: #D500C7;          /* Magenta (Triadic) */
+  --borde-input: #CBD5E1;
 
-  --font-display: 'Playfair Display', Georgia, serif;
-  --font-body: 'Inter', system-ui, sans-serif;
+  --font-display: 'Outfit', system-ui, sans-serif;
+  --font-body: 'Plus Jakarta Sans', system-ui, sans-serif;
 
   --radio: 16px;
   --radio-sm: 12px;
@@ -55,8 +56,8 @@ body {
 }
 
 /* --- Transiciones globales --- */
-button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .producto-row, .bottom-sheet-row, .alerta-item {
-  transition: all 0.2s ease;
+button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .producto-row {
+  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
 /* --- Header --- */
@@ -249,23 +250,21 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   align-items: center;
   justify-content: center;
   gap: 8px;
-  min-height: 52px;
-  height: auto;
-  border-radius: 12px;
+  height: 52px; /* Mínimo 52px alto */
+  border-radius: var(--radio-sm);
   font-family: var(--font-body);
   font-size: 18px; /* Mínimo 18px */
   font-weight: 600;
   cursor: pointer;
   border: none;
   white-space: nowrap;
-  padding: 14px 24px;
+  padding: 0 24px;
 }
 
 .btn-primario {
-  background: var(--dorado);
-  color: var(--blanco);
+  background: var(--dorado); /* Fondo dorado primario */
+  color: var(--blanco);      /* Texto blanco */
   border-radius: 12px;
-  padding: 18px 24px;
 }
 
 .btn-primario:active {
@@ -277,7 +276,6 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   background: var(--dorado);
   color: var(--blanco);
   border-radius: 12px;
-  padding: 18px 24px;
 }
 
 .btn-dorado:active {
@@ -289,7 +287,6 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
   background: var(--blanco);
   color: var(--negro);
   border: 1.5px solid var(--gris-borde);
-  border-radius: 12px;
 }
 
 .btn-secundario:active {
@@ -301,9 +298,10 @@ button, input, select, textarea, .nav-item, .chip, .fecha-item, .deposito-btn, .
 }
 
 .btn-sm {
-  padding: 10px 18px;
+  padding: 8px 16px;
   font-size: 16px;
-  min-height: 52px;
+  height: auto;
+  min-height: 40px;
 }
 
 /* --- Inputs --- */
@@ -535,10 +533,10 @@ input[type="date"].input-field::-webkit-calendar-picker-indicator {
 }
 
 .input-sublabel {
-  font-size: 13px;
+  font-size: 11px;
   font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   color: var(--gris-medio);
 }
 
@@ -549,7 +547,7 @@ input[type="date"].input-field::-webkit-calendar-picker-indicator {
   border: 1.5px solid var(--borde-input);
   border-radius: var(--radio-sm);
   font-family: var(--font-body);
-  font-size: 28px; /* 28px bold */
+  font-size: 24px;
   font-weight: 700;
   text-align: center;
   line-height: 52px;
@@ -1544,7 +1542,8 @@ input[type="number"] {
 }
 
 .cantidad-principal-val {
-  font-size: 28px;
+  font-family: var(--font-display);
+  font-size: 24px;
   font-weight: 700;
   color: var(--dorado);
   line-height: 1.2;

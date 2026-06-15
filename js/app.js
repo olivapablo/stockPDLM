@@ -29,7 +29,7 @@ async function initApp() {
     // Fuentes
     const link = document.createElement("link");
     link.rel = "stylesheet";
-    link.href = "https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Playfair+Display:wght@600;700&display=swap";
+    link.href = "https://fonts.googleapis.com/css2?family=Outfit:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap";
     document.head.appendChild(link);
 
     // Navegación
@@ -949,7 +949,7 @@ async function renderAlertas() {
           <div style="display:flex;flex-direction:column;align-items:end;gap:4px">
             <span style="font-size:0.9rem;font-weight:700;color:var(--rojo-alerta);white-space:nowrap">${descDias}</span>
             ${showRetirarBtn ? `
-            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:6px 12px;font-size:16px;height:auto;min-height:52px;margin-top:2px" onclick="confirmarRetirarLoteDesdeAlertas('${item.depositoId}', '${item.id}')">
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:2px 6px;font-size:0.7rem;height:auto;min-height:24px;margin-top:2px" onclick="confirmarRetirarLoteDesdeAlertas('${item.depositoId}', '${item.id}')">
               Retirar
             </button>` : ''}
           </div>
@@ -1581,7 +1581,7 @@ async function renderVencimientos() {
           </div>
           <div style="display:flex;flex-direction:column;align-items:end;gap:8px">
             ${badgeDias}
-            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:6px 12px;font-size:16px;height:auto;min-height:52px" onclick="confirmarRetirarLote('${item.depositoId}', '${item.id}')">
+            <button class="btn btn-secundario btn-sm" style="border-color:var(--rojo-alerta);color:var(--rojo-alerta);padding:4px 8px;font-size:0.75rem;height:auto;min-height:30px" onclick="confirmarRetirarLote('${item.depositoId}', '${item.id}')">
               Retirar
             </button>
           </div>
