@@ -2467,31 +2467,18 @@ async function renderConsumo() {
   el.innerHTML = `<div class="estado-vacio"><div class="vacio-icono">⏳</div><div class="vacio-texto">Cargando datos de consumo...</div></div>`;
 
   try {
-    // Fetch all stock history and entries
-    const [plazaStockSnap, lariojaStockSnap, plazaEntradasSnap, lariojaEntradasSnap] = await Promise.all([
+    // Fetch all stock history, entries and current live stock
+    const [plazaStockSnap, lariojaStockSnap, plazaEntradasSnap, lariojaEntradasSnap, plazaActual, lariojaActual] = await Promise.all([
       db.ref("stock/plaza").get(),
       db.ref("stock/larioja").get(),
       db.ref("entradas/plaza").get(),
-      db.ref("entradas/larioja").get()
+      db.ref("entradas/larioja").get(),
+      getStockActual("plaza"),
+      getStockActual("larioja")
     ]);
 
     const plazaStock = plazaStockSnap.val() || {};
     const lariojaStock = lariojaStockSnap.val() || {};
-
-    const fechas = [...new Set([...Object.keys(plazaStock), ...Object.keys(lariojaStock)])].sort();
-
-    if (fechas.length < 2) {
-      el.innerHTML = `
-        <div class="estado-vacio">
-          <div class="vacio-icono">📊</div>
-          <div class="vacio-texto">
-            Se necesitan al menos 2 conteos semanales de stock registrados para calcular el consumo.<br>
-            <span style="font-size:0.8rem;color:var(--gris-medio)">Actualmente hay ${fechas.length} conteo(s).</span>
-          </div>
-        </div>
-      `;
-      return;
-    }
 
     const entriesList = [];
     if (plazaEntradasSnap.exists()) {
@@ -2501,7 +2488,32 @@ async function renderConsumo() {
       Object.values(lariojaEntradasSnap.val()).forEach(ent => entriesList.push(ent));
     }
 
-    // Save data to state to avoid re-fetching
+    let fechas = [...new Set([...Object.keys(plazaStock), ...Object.keys(lariojaStock)])].sort();
+
+    // Si no hay ningún conteo registrado, creamos una fecha inicial virtual
+    if (fechas.length === 0) {
+      let startFecha = "";
+      if (entriesList.length > 0) {
+        const minEntryFecha = entriesList.map(e => e.fecha).sort()[0];
+        const d = new Date(minEntryFecha + "T00:00:00");
+        d.setDate(d.getDate() - 1);
+        startFecha = formatFecha(d);
+      } else {
+        const d = new Date();
+        d.setDate(d.getDate() - 7);
+        startFecha = formatFecha(d);
+      }
+      plazaStock[startFecha] = {};
+      lariojaStock[startFecha] = {};
+      fechas.push(startFecha);
+    }
+
+    // Añadimos el estado actual ("Ahora") como el punto final virtual
+    plazaStock["Ahora"] = plazaActual;
+    lariojaStock["Ahora"] = lariojaActual;
+    fechas.push("Ahora");
+
+    // Guardar datos en el estado para evitar recargar
     STATE.consumoRawData = { fechas, plazaStock, lariojaStock, entriesList };
 
     // Render container layout
@@ -2679,7 +2691,9 @@ function calcularConsumos(fechas, plazaStock, lariojaStock, entriesList) {
     // Sum entries in range (start, end]
     const entries = {};
     entriesList.forEach(ent => {
-      if (ent.fecha > start && ent.fecha <= end) {
+      const matchStart = ent.fecha > start;
+      const matchEnd = (end === "Ahora") ? true : (ent.fecha <= end);
+      if (matchStart && matchEnd) {
         entries[ent.productoId] = (entries[ent.productoId] || 0) + Number(ent.cantidad || 0);
       }
     });

@@ -346,6 +346,8 @@ function formatFecha(date) {
 }
 
 function formatFechaDisplay(fechaStr) {
+  if (fechaStr === "Ahora") return "Ahora";
+  if (!fechaStr || !fechaStr.includes("-")) return fechaStr || "";
   const [yyyy, mm, dd] = fechaStr.split("-");
   return `${dd}/${mm}/${yyyy}`;
 }
