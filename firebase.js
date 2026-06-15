@@ -4,13 +4,14 @@
 // en Firebase Console > Configuración del proyecto
 // =============================================
 const FIREBASE_CONFIG = {
-  apiKey: "AIzaSyCoQ_gzfCgREGPQKTbokFu4qqkxwTa9HX4",
+  apiKey: "AIzaSyCoQ_gzFCgREGPQKTbokFu4qqkxwTa9HX4",
   authDomain: "stock-plaza.firebaseapp.com",
   databaseURL: "https://stock-plaza-default-rtdb.firebaseio.com",
   projectId: "stock-plaza",
   storageBucket: "stock-plaza.firebasestorage.app",
   messagingSenderId: "1055032939567",
-  appId: "1:1055032939567:web:24a3ac2ff9b23cdc8322da"
+  appId: "1:1055032939567:web:24a3ac2ff9b23cdc8322da",
+  measurementId: "G-6ZP4BN6EP8"
 };
 
 // Inicializar Firebase
