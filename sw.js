@@ -2,7 +2,7 @@
 // SERVICE WORKER — Plaza de la Música Stock
 // =============================================
 
-const CACHE_NAME = "plaza-stock-v7";
+const CACHE_NAME = "plaza-stock-v8";
 const ASSETS = [
   "./",
   "./index.html",
