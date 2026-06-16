@@ -124,6 +124,17 @@ async function initApp() {
           authContainer.style.display = "flex";
           appContainer.style.display = "none";
           mostrarAuthVista("auth-login");
+
+          const savedEmail = localStorage.getItem("remember_email");
+          const savedPass = localStorage.getItem("remember_pass");
+          if (savedEmail && savedPass) {
+            const emailInput = document.getElementById("login-email");
+            const passInput = document.getElementById("login-password");
+            const rememberCheck = document.getElementById("login-remember");
+            if (emailInput) emailInput.value = savedEmail;
+            if (passInput) passInput.value = savedPass;
+            if (rememberCheck) rememberCheck.checked = true;
+          }
         }
       } catch (err) {
         alert("Error en Auth Listener: " + err.message);
@@ -154,6 +165,14 @@ async function iniciarSesionEmail() {
 
   try {
     await auth.signInWithEmailAndPassword(email, pass);
+    const remember = document.getElementById("login-remember")?.checked;
+    if (remember) {
+      localStorage.setItem("remember_email", email);
+      localStorage.setItem("remember_pass", pass);
+    } else {
+      localStorage.removeItem("remember_email");
+      localStorage.removeItem("remember_pass");
+    }
   } catch (error) {
     mostrarToast("Error: " + error.message, "error");
     btn.innerHTML = oldText;
@@ -215,7 +234,27 @@ async function recuperarPassword() {
   }
 }
 
-async function cerrarSesion() {
+function cerrarSesion() {
+  const overlay = document.getElementById("modal-overlay");
+  const modal = document.getElementById("modal-content");
+  if (!overlay || !modal) return;
+
+  modal.innerHTML = `
+    <div style="text-align:center;margin-bottom:20px;font-size:2.8rem">🚪</div>
+    <div class="modal-titulo" style="text-align:center">¿Cerrar sesión?</div>
+    <div style="font-size:0.9rem;color:var(--gris-medio);text-align:center;margin-bottom:24px;line-height:1.6">
+      ¿Estás seguro de que querés salir de la aplicación?
+    </div>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+      <button class="btn btn-secundario" onclick="cerrarModal()">Cancelar</button>
+      <button class="btn btn-primario" onclick="ejecutarCerrarSesion()">Cerrar sesión</button>
+    </div>
+  `;
+  overlay.classList.add("visible");
+}
+
+async function ejecutarCerrarSesion() {
+  cerrarModal();
   await auth.signOut();
 }
 
@@ -232,19 +271,19 @@ function ajustarInterfazPorRol() {
   if (STATE.userRole === "visualizador") {
     navBottom.innerHTML = `
       <button class="nav-item ${STATE.vistaActual === 'dashboard' ? 'activo' : ''}" data-vista="dashboard">
-        <span class="nav-icon">🏠</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
         Inicio
       </button>
       <button class="nav-item ${STATE.vistaActual === 'ver-stock' ? 'activo' : ''}" data-vista="ver-stock">
-        <span class="nav-icon">📊</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2" ry="2"></rect><line x1="9" y1="3" x2="9" y2="21"></line><line x1="15" y1="3" x2="15" y2="21"></line><line x1="3" y1="9" x2="21" y2="9"></line><line x1="3" y1="15" x2="21" y2="15"></line></svg></span>
         Ver Stock
       </button>
       <button class="nav-item ${STATE.vistaActual === 'consumo' ? 'activo' : ''}" data-vista="consumo">
-        <span class="nav-icon">📈</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 12h-4l-3 9L9 3l-3 9H2"></path></svg></span>
         Consumo
       </button>
       <button class="nav-item ${STATE.vistaActual === 'alertas' ? 'activo' : ''}" data-vista="alertas">
-        <span class="nav-icon">🔔</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
         Alertas
       </button>
     `;
@@ -252,23 +291,23 @@ function ajustarInterfazPorRol() {
     // Admin o Editor
     navBottom.innerHTML = `
       <button class="nav-item ${STATE.vistaActual === 'dashboard' ? 'activo' : ''}" data-vista="dashboard">
-        <span class="nav-icon">🏠</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"></path><polyline points="9 22 9 12 15 12 15 22"></polyline></svg></span>
         Inicio
       </button>
       <button class="nav-item ${STATE.vistaActual === 'cargar' ? 'activo' : ''}" data-vista="cargar">
-        <span class="nav-icon">📦</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"></path><polyline points="3.27 6.96 12 12.01 20.73 6.96"></polyline><line x1="12" y1="22.08" x2="12" y2="12"></line></svg></span>
         Cargar
       </button>
       <button class="nav-item ${STATE.vistaActual === 'alertas' ? 'activo' : ''}" data-vista="alertas">
-        <span class="nav-icon">🔔</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"></path><path d="M13.73 21a2 2 0 0 1-3.46 0"></path></svg></span>
         Alertas
       </button>
       <button class="nav-item ${STATE.vistaActual === 'historial' ? 'activo' : ''}" data-vista="historial">
-        <span class="nav-icon">📋</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 4h2a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h2"></path><rect x="8" y="2" width="8" height="4" rx="1" ry="1"></rect></svg></span>
         Historial
       </button>
       <button class="nav-item ${['entradas', 'vencimientos', 'config'].includes(STATE.vistaActual) ? 'activo' : ''}" id="btn-nav-mas" onclick="abrirMenuMas()">
-        <span class="nav-icon">➕</span>
+        <span class="nav-icon"><svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="1"></circle><circle cx="19" cy="12" r="1"></circle><circle cx="5" cy="12" r="1"></circle></svg></span>
         Más
       </button>
     `;
@@ -288,11 +327,11 @@ window.abrirMenuMas = function() {
 
   let optionsHTML = `
     <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('entradas')">
-      <span class="bottom-sheet-row-icon">📥</span>
+      <span class="bottom-sheet-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="17 10 12 15 7 10"></polyline><line x1="12" y1="3" x2="12" y2="15"></line><path d="M22 12H16L14 14H10L8 12H2V20A2 2 0 0 0 4 22H20A2 2 0 0 0 22 20V12Z"></path></svg></span>
       <span class="bottom-sheet-row-text">Entrada de Mercadería</span>
     </div>
     <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('vencimientos')">
-      <span class="bottom-sheet-row-icon">📅</span>
+      <span class="bottom-sheet-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect><line x1="16" y1="2" x2="16" y2="6"></line><line x1="8" y1="2" x2="8" y2="6"></line><line x1="3" y1="10" x2="21" y2="10"></line></svg></span>
       <span class="bottom-sheet-row-text">Vencimientos</span>
     </div>
   `;
@@ -300,7 +339,7 @@ window.abrirMenuMas = function() {
   if (STATE.userRole === "admin" || STATE.userRole === "editor") {
     optionsHTML += `
       <div class="bottom-sheet-row" onclick="seleccionarOpcionMas('config')">
-        <span class="bottom-sheet-row-icon">⚙️</span>
+        <span class="bottom-sheet-row-icon"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
         <span class="bottom-sheet-row-text">Configuración</span>
       </div>
     `;
@@ -474,11 +513,11 @@ async function renderDashboard() {
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
           <div style="padding:12px;background:var(--gris-fondo);border-radius:var(--radio-sm);text-align:center">
             <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);margin-bottom:4px">Plaza</div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--negro)">${ultimaPlaza}</div>
+            <div style="font-size:0.9rem;font-weight:700;color: var(--blanco)">${ultimaPlaza}</div>
           </div>
           <div style="padding:12px;background:var(--gris-fondo);border-radius:var(--radio-sm);text-align:center">
             <div style="font-size:0.68rem;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);margin-bottom:4px">La Rioja</div>
-            <div style="font-size:0.9rem;font-weight:700;color:var(--negro)">${ultimaLarioja}</div>
+            <div style="font-size:0.9rem;font-weight:700;color: var(--blanco)">${ultimaLarioja}</div>
           </div>
         </div>
       </div>
@@ -732,8 +771,8 @@ function confirmarGuardar() {
     <div style="text-align:center;margin-bottom:20px;font-size:2.8rem">📦</div>
     <div class="modal-titulo" style="text-align:center">¿Guardamos el stock?</div>
     <div style="font-size:0.9rem;color:var(--gris-medio);text-align:center;margin-bottom:24px;line-height:1.6">
-      <strong style="color:var(--negro)">${depositoText}</strong> · ${fecha}<br>
-      Responsable: <strong style="color:var(--negro)">${responsable}</strong>
+      <strong style="color: var(--blanco)">${depositoText}</strong> · ${fecha}<br>
+      Responsable: <strong style="color: var(--blanco)">${responsable}</strong>
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
       <button class="btn btn-secundario" onclick="cerrarModal()">Cancelar</button>
@@ -818,11 +857,13 @@ function mostrarModalExito(fecha, guardados, hayOffline) {
       ${mensajeGuardado}
     </div>
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-bottom:12px">
-      <button class="btn btn-dorado btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="descargarPDF('${fecha}');cerrarModal()">
-        📄 PDF
+      <button class="btn btn-rojo btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="descargarPDF('${fecha}');cerrarModal()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.04A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+        PDF
       </button>
-      <button class="btn btn-primario btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="exportarExcel('${fecha}');cerrarModal()">
-        🟢 Excel
+      <button class="btn btn-verde btn-sm" style="padding: 0 8px; font-size: 15px;" onclick="exportarExcel('${fecha}');cerrarModal()">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.04A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+        Excel
       </button>
     </div>
     <button class="btn btn-secundario btn-full" style="margin-bottom:12px" onclick="compartirPDF('${fecha}')">
@@ -1022,7 +1063,7 @@ async function renderHistorial() {
         <div>
           <div class="fecha-display">${formatFechaDisplay(f)}</div>
         </div>
-        <div style="font-size:1.2rem;color:var(--gris-borde)">›</div>
+        <div style="font-size:1.2rem;color:var(--gris-medio)">›</div>
       </div>
     `;
   });
@@ -1101,7 +1142,7 @@ async function renderComparacion() {
     );
     if (!tieneData) return;
 
-    html += `<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:var(--gris-medio);padding:10px 0 4px;border-bottom:1px solid var(--gris-borde);margin-bottom:4px">${cat}</div>`;
+    html += `<div style="font-size:0.68rem;font-weight:700;text-transform:uppercase;letter-spacing:0.1em;color:#A78BFA;padding:10px 0 4px;border-bottom:1px solid var(--gris-borde);margin-bottom:4px">${cat}</div>`;
 
     prodsCat.forEach(p => {
       const cantidades = fechas.map(f => {
@@ -1116,9 +1157,9 @@ async function renderComparacion() {
 
       html += `
         <div style="display:grid;grid-template-columns:${b ? "1fr 1fr 1fr" : "1fr 1fr"};gap:8px;padding:8px 0;border-bottom:1px solid var(--gris-fondo);align-items:center">
-          <div style="font-size:0.85rem;color:var(--negro)">${p.nombre}</div>
+          <div style="font-size:0.85rem;color: var(--blanco)">${p.nombre}</div>
           ${cantidades.map(c => `
-            <div style="text-align:right;font-size:1rem;font-weight:700;color:${c < umbral ? "var(--rojo-alerta)" : "var(--negro)"}">${c}</div>
+            <div style="text-align:right;font-size:1rem;font-weight:700;color:${c < umbral ? "var(--rojo-alerta)" : "var(--blanco)"}">${c}</div>
           `).join("")}
         </div>
       `;
@@ -1130,11 +1171,13 @@ async function renderComparacion() {
   // Botones de exportación
   html += `
     <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;margin-top:8px">
-      <button class="btn btn-secundario btn-sm" onclick="descargarPDF('${a}')">
-        ⬇️ Descargar PDF
+      <button class="btn btn-rojo btn-sm" onclick="descargarPDF('${a}')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.04A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+        Descargar PDF
       </button>
-      <button class="btn btn-primario btn-sm" onclick="exportarExcel('${a}')">
-        🟢 Descargar Excel
+      <button class="btn btn-verde btn-sm" onclick="exportarExcel('${a}')">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="margin-right:4px"><polyline points="8 17 12 21 16 17"></polyline><line x1="12" y1="12" x2="12" y2="21"></line><path d="M20.88 18.04A5 5 0 0 0 18 9h-1.26A8 8 0 1 0 3 16.29"></path></svg>
+        Descargar Excel
       </button>
     </div>
     <button class="btn btn-dorado btn-full" style="margin-top:8px" onclick="compartirPDF('${a}')">
@@ -1327,7 +1370,7 @@ function renderEntradas() {
         </div>
 
         <div style="padding:10px 12px;background:var(--gris-fondo);border-radius:var(--radio-sm);margin-bottom:16px;font-size:0.85rem;color:var(--gris-medio)">
-          📅 Fecha: <strong style="color:var(--negro)" id="entrada-fecha-hoy"></strong> &nbsp;&nbsp; 👤 Responsable: <strong style="color:var(--negro)">${STATE.responsable}</strong>
+          📅 Fecha: <strong style="color: var(--blanco)" id="entrada-fecha-hoy"></strong> &nbsp;&nbsp; 👤 Responsable: <strong style="color: var(--blanco)">${STATE.responsable}</strong>
         </div>
 
         <button class="btn btn-primario btn-full" id="btn-registrar-entrada" onclick="registrarEntrada()">
@@ -1386,9 +1429,7 @@ function renderSelectorProductosEntrada(filtro) {
       const nombre = p.nombre.replace(/'/g, "&#39;");
       const unidad = p.unidad.replace(/'/g, "&#39;");
       html += `
-        <div onclick="seleccionarProductoEntrada('${p.id}', '${nombre}', '${unidad}')"
-          style="padding:10px 14px;cursor:pointer;border-bottom:1px solid var(--gris-fondo);font-size:0.9rem;display:flex;justify-content:space-between;align-items:center"
-          onmouseover="this.style.background='var(--gris-fondo)'" onmouseout="this.style.background=''">
+        <div onclick="seleccionarProductoEntrada('${p.id}', '${nombre}', '${unidad}')" class="search-result-row">
           <span>${p.nombre}</span>
           <span style="font-size:0.75rem;color:var(--gris-medio)">${p.unidad}</span>
         </div>
@@ -1725,9 +1766,7 @@ function renderSelectorProductosModalVenc(filtro) {
       const nombre = p.nombre.replace(/'/g, "&#39;");
       const unidad = p.unidad.replace(/'/g, "&#39;");
       html += `
-        <div onclick="seleccionarProductoModalVenc('${p.id}', '${nombre}', '${unidad}')"
-          style="padding:8px 12px;cursor:pointer;border-bottom:1px solid var(--gris-fondo);font-size:0.85rem;display:flex;justify-content:space-between;align-items:center"
-          onmouseover="this.style.background='var(--gris-fondo)'" onmouseout="this.style.background=''">
+        <div onclick="seleccionarProductoModalVenc('${p.id}', '${nombre}', '${unidad}')" class="search-result-row" style="font-size: 0.85rem; padding: 8px 12px;">
           <span>${p.nombre}</span>
           <span style="font-size:0.7rem;color:var(--gris-medio)">${p.unidad}</span>
         </div>
@@ -2248,10 +2287,10 @@ function solicitarResetFabrica() {
     <div class="modal-titulo" style="text-align:center;color:var(--rojo-alerta)">Borrar Historial y Stock</div>
     <div style="font-size:0.88rem;color:var(--gris-medio);text-align:center;margin-bottom:20px;line-height:1.6">
       Esta acción vaciará por completo el stock y el historial de fechas de la base de datos.<br>
-      <strong style="color:var(--negro)">Tus productos y configuraciones se mantendrán intactos.</strong>
+      <strong style="color: var(--blanco)">Tus productos y configuraciones se mantendrán intactos.</strong>
     </div>
     <div style="margin-bottom:20px; text-align:left">
-      <label style="font-size:0.85rem;font-weight:700;color:var(--negro);display:block;margin-bottom:8px">Ingresá la contraseña para confirmar:</label>
+      <label style="font-size:0.85rem;font-weight:700;color: var(--blanco);display:block;margin-bottom:8px">Ingresá la contraseña para confirmar:</label>
       <div style="position:relative">
         <input type="password" id="input-reset-password" style="width:100%;text-align:left;font-size:16px;font-family:var(--font-body);padding:0 40px 0 14px;height:48px;border:1.5px solid var(--borde-input);border-radius:var(--radio-sm)" placeholder="Contraseña">
         <button type="button" onclick="togglePasswordVisibility()" style="position:absolute;right:10px;top:50%;transform:translateY(-50%);background:none;border:none;font-size:1.2rem;cursor:pointer;color:var(--gris-medio);padding:4px">👁️</button>
@@ -2540,14 +2579,14 @@ async function renderConsumo() {
         <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 10px;">
           <div>
             <label class="input-label" style="margin-bottom: 4px; display: block; font-size: 0.65rem;">Categoría</label>
-            <select id="consumo-filtro-categoria" onchange="cambiarFiltroCategoriaConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--negro); font-family: inherit;">
+            <select id="consumo-filtro-categoria" onchange="cambiarFiltroCategoriaConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--blanco); font-family: inherit;">
               <option value="todas" ${STATE.consumoCategoria === 'todas' ? 'selected' : ''}>Todas</option>
               ${categorias.map(cat => `<option value="${cat}" ${STATE.consumoCategoria === cat ? 'selected' : ''}>${cat}</option>`).join('')}
             </select>
           </div>
           <div>
             <label class="input-label" style="margin-bottom: 4px; display: block; font-size: 0.65rem;">Bebida</label>
-            <select id="consumo-filtro-producto" onchange="cambiarFiltroProductoConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--negro); font-family: inherit;">
+            <select id="consumo-filtro-producto" onchange="cambiarFiltroProductoConsumo(this.value)" style="padding: 10px; font-size: 0.85rem; height: 44px; background-color: var(--gris-fondo); border: 1px solid var(--gris-borde); border-radius: var(--radio-sm); width: 100%; color: var(--blanco); font-family: inherit;">
               <!-- Se poblará dinámicamente -->
             </select>
           </div>
@@ -2839,3 +2878,4 @@ function calcularConsumos(fechas, plazaStock, lariojaStock, entriesList) {
   
   return intervals;
 }
+
